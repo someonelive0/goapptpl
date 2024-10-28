@@ -2,28 +2,30 @@ package main
 
 import (
 	"database/sql"
-	"fmt"
-	"log"
 	"net/url"
 	"strings"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gofiber/fiber/v3"
+	log "github.com/sirupsen/logrus"
 )
 
-func AddMysqlHandler(r fiber.Router) error {
-	println("0 ---------------->")
+type MysqlHandler struct {
+	Dbconfig DBConfig
+}
 
-	// r := app.Group("/mysql")
+// r := app.Group("/mysql")
+func (p *MysqlHandler) AddRouter(r fiber.Router) error {
+	log.Info("MysqlHandler AddRouter")
 
-	r.Get("/tables", tablesHandler)
-	r.Get("/table/:table/columns", columnsHandler)
-	r.Get("/table/:table", tableHandler)
+	r.Get("/tables", p.tablesHandler)
+	r.Get("/table/:table/columns", p.columnsHandler)
+	r.Get("/table/:table", p.tableHandler)
 
 	return nil
 }
 
-func tablesHandler(c fiber.Ctx) error {
+func (p *MysqlHandler) tablesHandler(c fiber.Ctx) error {
 	sqltext := `
 	select json_object(
 		'table_catalog', table_catalog,
@@ -42,10 +44,10 @@ func tablesHandler(c fiber.Ctx) error {
 	from INFORMATION_SCHEMA.TABLES
 	where table_schema = 'idss_dsmcp'`
 
-	return sqlHandler(c, sqltext)
+	return p.sqlHandler(c, sqltext)
 }
 
-func columnsHandler(c fiber.Ctx) error {
+func (p *MysqlHandler) columnsHandler(c fiber.Ctx) error {
 	table, _ := url.QueryUnescape(c.Params("table"))
 	sqltext := `
 	select json_object(
@@ -65,13 +67,13 @@ func columnsHandler(c fiber.Ctx) error {
 	from INFORMATION_SCHEMA.COLUMNS
 	where table_schema = 'idss_dsmcp' and table_name = '` + table + `'`
 
-	return sqlHandler(c, sqltext)
+	return p.sqlHandler(c, sqltext)
 }
 
-func tableHandler(c fiber.Ctx) error {
+func (p *MysqlHandler) tableHandler(c fiber.Ctx) error {
 	table, _ := url.QueryUnescape(c.Params("table"))
 	// columns := "id,api_id,app_id,hostname,buz_source,asset_name,api_method,api_endpoint,content_type,module_code,department_id,business_id,description,follow,monitor_cover,fever,asset_state,asset_value,sen_fever,discovery_time,risk_level,carrier_type,validate_time,ext_info,merge_state,check_state,tenant_id,create_user,create_time,update_user,update_time,api_no,pod,resource_pool,asset_code"
-	columns, err := getColumns(table)
+	columns, err := p.getColumns(table)
 	if err != nil {
 		c.WriteString(err.Error())
 		return err
@@ -92,14 +94,14 @@ func tableHandler(c fiber.Ctx) error {
 	sqltext += `	) as json 
 	from ` + table + ` limit ` + limit
 
-	return sqlHandler(c, sqltext)
+	return p.sqlHandler(c, sqltext)
 }
 
-func sqlHandler(c fiber.Ctx, sqltext string) error {
-	log.Printf("/mysql/sql: %s\n", sqltext)
-	db, err := sql.Open("mysql", "idss:BDsec2022,,@tcp(192.168.30.41:3306)/idss_dsmcp")
+func (p *MysqlHandler) sqlHandler(c fiber.Ctx, sqltext string) error {
+	log.Tracef("/mysql sql: %s\n", sqltext)
+	db, err := sql.Open(p.Dbconfig.Dbtype, p.Dbconfig.Dsn[0])
 	if err != nil {
-		fmt.Println("Error connecting to the database:", err)
+		log.Error("Error open database:", err)
 		c.WriteString(err.Error())
 		return err
 	}
@@ -107,7 +109,7 @@ func sqlHandler(c fiber.Ctx, sqltext string) error {
 
 	rows, err := db.Query(sqltext)
 	if err != nil {
-		fmt.Println("Error executing query:", err)
+		log.Error("Error executing query:", err)
 		c.WriteString(err.Error())
 		return err
 	}
@@ -121,7 +123,7 @@ func sqlHandler(c fiber.Ctx, sqltext string) error {
 		var jsonstr string
 		err = rows.Scan(&jsonstr)
 		if err != nil {
-			fmt.Println("Error scanning row:", err)
+			log.Error("Error scanning row:", err)
 			continue
 		}
 		if i > 0 {
@@ -133,17 +135,18 @@ func sqlHandler(c fiber.Ctx, sqltext string) error {
 	c.WriteString("]")
 
 	if err = rows.Err(); err != nil {
-		fmt.Println("Error iterating through rows:", err)
+		log.Error("Error iterating through rows:", err)
+		return err
 	}
 
 	return nil
 }
 
 // get columns of table to string with ',' split
-func getColumns(table string) (string, error) {
-	db, err := sql.Open("mysql", "idss:BDsec2022,,@tcp(192.168.30.41:3306)/idss_dsmcp")
+func (p *MysqlHandler) getColumns(table string) (string, error) {
+	db, err := sql.Open(p.Dbconfig.Dbtype, p.Dbconfig.Dsn[0])
 	if err != nil {
-		fmt.Println("Error connecting to the database:", err)
+		log.Error("Error open database:", err)
 		return "", err
 	}
 	defer db.Close()
@@ -152,7 +155,7 @@ func getColumns(table string) (string, error) {
 	where table_schema = 'idss_dsmcp' and table_name = '` + table + `'`
 	rows, err := db.Query(sqltext)
 	if err != nil {
-		fmt.Println("Error executing query:", err)
+		log.Error("Error executing query:", err)
 		return "", err
 	}
 	defer rows.Close()
@@ -161,14 +164,15 @@ func getColumns(table string) (string, error) {
 	for rows.Next() {
 		err = rows.Scan(&columns)
 		if err != nil {
-			fmt.Println("Error scanning row:", err)
+			log.Error("Error scanning row:", err)
 			continue
 		}
 		break // just get one row
 	}
 
 	if err = rows.Err(); err != nil {
-		fmt.Println("Error iterating through rows:", err)
+		log.Error("Error iterating through rows:", err)
+		return "", err
 	}
 
 	return columns, nil

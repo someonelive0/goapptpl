@@ -17,6 +17,7 @@ var (
 	param_version = flag.Bool("v", false, "version")
 	param_config  = flag.String("f", "etc/goapptpl.toml", "config filename")
 	START_TIME    = time.Now()
+	myconfig      *MyConfig
 )
 
 func init() {
@@ -33,11 +34,12 @@ func init() {
 	fmt.Println("pwd:", pwd)
 
 	// load config
-	var myconfig, err = LoadConfig(*param_config)
+	config, err := LoadConfig(*param_config)
 	if err != nil {
 		fmt.Printf("loadConfig error %s\n", err)
 		os.Exit(1)
 	}
+	myconfig = config
 
 	// init log
 	err = utils.InitLogRotate(myconfig.LogConfig.Path, myconfig.LogConfig.Filename,
@@ -73,35 +75,35 @@ func main() {
 	// Uer Middleware
 	// Match any route
 	app.Use(func(c fiber.Ctx) error {
-		log.Infof("🥇 Any handler, 匹配任何路由" + c.Path())
+		log.Trace("🥇 Any handler, 匹配任何路由: " + c.Path())
 		return c.Next()
 	})
 
 	// // Match all routes starting with /api
 	// app.Use("/api", func(c fiber.Ctx) error {
-	// 	fmt.Println("🥈 Second handler")
+	// 	log.Trace("🥈 Second handler")
 	// 	return c.Next()
 	// })
 
 	// // Match request starting with /api
 	// app.Use("/api", func(c fiber.Ctx) error {
-	// 	fmt.Println("🥈 third handler")
+	// 	log.Trace("🥈 third handler")
 	// 	return c.Next()
 	// })
 
 	// // Match requests starting with /api or /home (multiple-prefix support)
 	// app.Use([]string{"/api", "/home"}, func(c fiber.Ctx) error {
-	// 	fmt.Println("🥈 Fourth handler")
+	// 	log.Trace("🥈 Fourth handler")
 	// 	return c.Next()
 	// })
 
 	// // Attach multiple handlers
 	// app.Use("/api", func(c fiber.Ctx) error {
 	// 	c.Set("X-Custom-Header", random.String(32))
-	// 	fmt.Println("🥈 Fifth handler")
+	// 	log.Trace("🥈 Fifth handler")
 	// 	return c.Next()
 	// }, func(c fiber.Ctx) error {
-	// 	fmt.Println("🥈 Fifth 2 handler")
+	// 	log.Trace("🥈 Fifth 2 handler")
 	// 	return c.Next()
 	// })
 
@@ -114,7 +116,9 @@ func main() {
 
 	AddMinioHandler(app)
 	// AddMinioHandler1(app.Group("/minio"))
-	AddMysqlHandler(app.Group("/mysql"))
+
+	mysqlHdl := MysqlHandler{Dbconfig: myconfig.MysqlConfig}
+	mysqlHdl.AddRouter(app.Group("/mysql"))
 
 	// // GET /flights/LAX-SFO
 	// app.Get("/flights/:from-:to", func(c fiber.Ctx) error {
@@ -146,9 +150,9 @@ func main() {
 	// app.Get("/metrics", monitor.New())
 
 	// data, _ := json.MarshalIndent(app.Stack(), "", "  ")
-	// fmt.Println(string(data))
+	// log.Debug(string(data))
 	// data, _ = json.MarshalIndent(app.Config(), "", "  ")
-	// fmt.Printf("config: %s\n", data)
+	// log.Debug("config: %s\n", data)
 
 	log.Fatal(app.Listen("[::]:3000", fiber.ListenConfig{
 		CertFile:    "etc/cert.pem",
