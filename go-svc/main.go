@@ -114,8 +114,9 @@ func main() {
 	// 	return c.SendString(msg) // => ✋ register
 	// })
 
-	AddMinioHandler(app)
-	// AddMinioHandler1(app.Group("/minio"))
+	// AddMinioHandler(app)
+	minioHdl := MinioHandler{Minioconfig: &myconfig.MinioConfig}
+	minioHdl.AddRouter(app.Group("/minio"))
 
 	mysqlHdl := MysqlHandler{Dbconfig: &myconfig.MysqlConfig}
 	mysqlHdl.AddRouter(app.Group("/mysql"))

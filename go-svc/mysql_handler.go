@@ -195,7 +195,7 @@ func (p *MysqlHandler) openDB() error {
 	//设置最大开放连接数，注意该值为小于0或等于0指的是无限制连接数
 	db.SetMaxOpenConns(p.Dbconfig.MaxOpenConns)
 
-	//设置空闲连接数，小于等于0表示无限制
+	//设置空闲连接数，将此值设置为小于或等于0将意味着不保留空闲连接，即立即关闭连接
 	db.SetMaxIdleConns(p.Dbconfig.MaxIdleConns)
 
 	//设置最大空闲超时

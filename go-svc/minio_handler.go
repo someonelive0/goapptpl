@@ -6,61 +6,75 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
-	"log"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+	log "github.com/sirupsen/logrus"
 )
 
-func AddMinioHandler(app *fiber.App) error {
-	println("0 ---------------->")
+type MinioHandler struct {
+	Minioconfig *MinioConfig
+	cli         *minio.Client
+}
 
-	minio_api := app.Group("/minio")
+// r := app.Group("/minio")
+func (p *MinioHandler) AddRouter(r fiber.Router) error {
+	log.Info("MinioHandler AddRouter")
 
-	minio_api.Get("/buckets", bucketsHandler)
-	minio_api.Get("/bucket/:bucket/objects", objectsHandler)
-	minio_api.Get("/bucket/:bucket/object-meta/:object", objectInfoHandler)
-	minio_api.Get("/bucket/:bucket/object/:object", objectHandler)
-	// minio_api.Head("/bucket/:bucket/object/:object", objectInfoHander)
+	r.Get("/buckets", p.bucketsHandler)
+	r.Get("/bucket/:bucket/objects", p.objectsHandler)
+	r.Get("/bucket/:bucket/object-meta/:object", p.objectInfoHandler)
+	r.Get("/bucket/:bucket/object/:object", p.objectHandler)
+	// r.Head("/bucket/:bucket/object/:object", objectInfoHander)
 
 	return nil
 }
 
-func bucketsHandler(c fiber.Ctx) error {
-	log.Printf("/minio/buckets\n")
-	minioClient, err := getMinioClient()
-	if err != nil {
-		log.Println(err)
+func (p *MinioHandler) bucketsHandler(c fiber.Ctx) error {
+	log.Debug("/minio/buckets")
+	if p.cli == nil {
+		if err := p.getMinioClient(); err != nil {
+			return err
+		}
 	}
 
-	// log.Printf("minioClient %#v\n", minioClient) // minioClient is now setup
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(p.Minioconfig.Timeout))
+	defer cancel()
 
-	buckets, err := minioClient.ListBuckets(context.Background())
+	// go func() {
+	// 	<-ctx.Done()
+	// 	log.Error("ListBuckets timeout, ", ctx.Err())
+	// }()
+
+	buckets, err := p.cli.ListBuckets(ctx)
 	if err != nil {
-		log.Printf("ListBuckets failed %s\n", err)
+		log.Errorf("ListBuckets failed: %v", err)
+		return err
 	}
-	// log.Printf("buckets %#v\n", buckets) // minioClient is now setup
+	// log.Debug("buckets %#v\n", buckets) // minioClient is now setup
 
 	c.Context().SetContentType("application/json")
 	data, _ := json.MarshalIndent(buckets, "", "  ")
 	return c.Send(data)
+
 }
 
-func objectsHandler(c fiber.Ctx) error {
-	log.Printf("/minio/bucket/:bucket/objects\n")
-	minioClient, err := getMinioClient()
-	if err != nil {
-		log.Println(err)
+func (p *MinioHandler) objectsHandler(c fiber.Ctx) error {
+	log.Debug("/minio/bucket/:bucket/objects\n")
+	if p.cli == nil {
+		if err := p.getMinioClient(); err != nil {
+			return err
+		}
 	}
 
-	// log.Printf("minioClient %#v\n", minioClient) // minioClient is now setup
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(p.Minioconfig.Timeout))
 	defer cancel()
 
-	objectCh := minioClient.ListObjects(ctx, c.Params("bucket"),
+	objectCh := p.cli.ListObjects(ctx, c.Params("bucket"),
 		minio.ListObjectsOptions{
 			Prefix:    "",
 			Recursive: true,
@@ -87,7 +101,7 @@ func objectsHandler(c fiber.Ctx) error {
 }
 
 // GET /minio/bucket/:bucket/object/:object?mime=json|xml
-func objectInfoHandler(c fiber.Ctx) error {
+func (p *MinioHandler) objectInfoHandler(c fiber.Ctx) error {
 	log.Printf("/minio/bucket/:bucket/object/:object\n")
 	bucket, _ := url.QueryUnescape(c.Params("bucket"))
 	object, _ := url.QueryUnescape(c.Params("object"))
@@ -98,16 +112,16 @@ func objectInfoHandler(c fiber.Ctx) error {
 	// }
 	mime := c.Query("mime", "json") // if Queries params mime is not set, default to json
 
-	minioClient, err := getMinioClient()
-	if err != nil {
-		log.Println(err)
+	if p.cli == nil {
+		if err := p.getMinioClient(); err != nil {
+			return err
+		}
 	}
 
-	// log.Printf("minioClient %#v\n", minioClient) // minioClient is now setup
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(p.Minioconfig.Timeout))
 	defer cancel()
 
-	objectInfo, err := minioClient.StatObject(ctx, bucket, object,
+	objectInfo, err := p.cli.StatObject(ctx, bucket, object,
 		minio.StatObjectOptions{})
 	if err != nil {
 		c.Writef("bucket: '%s', object: '%s', ", bucket, object)
@@ -131,22 +145,22 @@ func objectInfoHandler(c fiber.Ctx) error {
 	}
 }
 
-func objectHandler(c fiber.Ctx) error {
+func (p *MinioHandler) objectHandler(c fiber.Ctx) error {
 	log.Printf("/minio/bucket/:bucket/object/:object\n")
 	bucket, _ := url.QueryUnescape(c.Params("bucket"))
 	object, _ := url.QueryUnescape(c.Params("object"))
 	// object := c.Params("object")
 
-	minioClient, err := getMinioClient()
-	if err != nil {
-		log.Println(err)
+	if p.cli == nil {
+		if err := p.getMinioClient(); err != nil {
+			return err
+		}
 	}
 
-	// log.Printf("minioClient %#v\n", minioClient) // minioClient is now setup
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(p.Minioconfig.Timeout))
 	defer cancel()
 
-	object_fd, err := minioClient.GetObject(ctx, bucket, object,
+	object_fd, err := p.cli.GetObject(ctx, bucket, object,
 		minio.GetObjectOptions{})
 	if err != nil {
 		c.Writef("bucket: '%s', object: '%s', ", bucket, object)
@@ -163,34 +177,19 @@ func objectHandler(c fiber.Ctx) error {
 	return err
 }
 
-func getMinioClient() (*minio.Client, error) {
-	endpoint := "172.16.0.243:9098"
-	accessKeyID := "minioadmin"
-	secretAccessKey := "minioadmin"
-	useSSL := false
+func (p *MinioHandler) getMinioClient() error {
 	// Initialize minio client object.
-	minioClient, err := minio.New(endpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(accessKeyID, secretAccessKey, ""),
-		Secure: useSSL,
-	})
+	minioClient, err := minio.New(p.Minioconfig.Addr,
+		&minio.Options{
+			Creds:  credentials.NewStaticV4(p.Minioconfig.User, p.Minioconfig.Password, ""),
+			Secure: p.Minioconfig.Ssl,
+		})
 	if err != nil {
-		log.Println(err)
+		log.Error("connect minio '%s' failed: %v", p.Minioconfig.Addr, err)
+		return err
 	}
 
-	return minioClient, err
+	// log.Printf("minioClient %#v\n", minioClient) // minioClient is now setup
+	p.cli = minioClient
+	return nil
 }
-
-// func AddMinioHandler1(r fiber.Router) error {
-// 	println("0 ---------------->")
-
-// 	// minio_api := app.Group("/minio", func(c fiber.Ctx) error {
-// 	// 	println("1 ---------------->")
-// 	// 	return c.SendString("Minio ")
-// 	// })
-
-// 	r.Get("/buckets", func(c fiber.Ctx) error {
-// 		println("2 -------- --------  ===>")
-// 	})
-
-// 	return nil
-// }

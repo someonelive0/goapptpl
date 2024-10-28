@@ -18,6 +18,14 @@ type DBConfig struct {
 	Dsn          []string `toml:"dsn" json:"dsn"`
 }
 
+type MinioConfig struct {
+	Addr     string `toml:"addr" json:"addr"`
+	User     string `toml:"user" json:"user"`
+	Password string `toml:"password" json:"password"`
+	Ssl      bool   `toml:"ssl" json:"ssl"`
+	Timeout  uint   `toml:"timeout" json:"timeout"`
+}
+
 type LogConfig struct {
 	Level         string `toml:"level" json:"level"`
 	Path          string `toml:"path" json:"path"`
@@ -34,8 +42,9 @@ type MyConfig struct {
 	Host    string `toml:"host" json:"host"`
 	Port    uint   `toml:"port" json:"port"`
 
-	MysqlConfig DBConfig  `toml:"mysql" json:"mysql"`
-	LogConfig   LogConfig `toml:"log" json:"log"`
+	MysqlConfig DBConfig    `toml:"mysql" json:"mysql"`
+	MinioConfig MinioConfig `toml:"minio" json:"minio"`
+	LogConfig   LogConfig   `toml:"log" json:"log"`
 }
 
 func (p *MyConfig) Dump() []byte {
