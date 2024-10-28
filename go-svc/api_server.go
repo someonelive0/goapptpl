@@ -25,7 +25,7 @@ func (p *ApiServer) Start() error {
 		UnescapePath:  false, // default false
 	})
 
-	log.Info("🚀 API server started")
+	log.Info("🚀 API server starting...")
 
 	// Uer Middleware
 	// Match any route

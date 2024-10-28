@@ -8,14 +8,15 @@ import (
 	"strings"
 	"time"
 
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/go-sql-driver/mysql"
 	"github.com/gofiber/fiber/v3"
 	log "github.com/sirupsen/logrus"
 )
 
 type MysqlHandler struct {
 	Dbconfig *DBConfig
-	db       *sql.DB
+	db       *sql.DB       // mysql dbpool
+	cfg      *mysql.Config // mysql config of dsn
 }
 
 // r := app.Group("/mysql")
@@ -46,7 +47,7 @@ func (p *MysqlHandler) tablesHandler(c fiber.Ctx) error {
 		'table_comment', table_comment
 		) as json
 	from INFORMATION_SCHEMA.TABLES
-	where table_schema = 'idss_dsmcp'`
+	where table_schema = '` + p.cfg.DBName + `'`
 
 	return p.sqlHandler(c, sqltext)
 }
@@ -69,7 +70,7 @@ func (p *MysqlHandler) columnsHandler(c fiber.Ctx) error {
 		'column_comment', column_comment
 		) as json 
 	from INFORMATION_SCHEMA.COLUMNS
-	where table_schema = 'idss_dsmcp' and table_name = '` + table + `'`
+	where table_schema = '` + p.cfg.DBName + `' and table_name = '` + table + `'`
 
 	return p.sqlHandler(c, sqltext)
 }
@@ -153,7 +154,7 @@ func (p *MysqlHandler) getColumns(table string) (string, error) {
 	}
 
 	sqltext := `select group_concat(column_name) from INFORMATION_SCHEMA.COLUMNS
-	where table_schema = 'idss_dsmcp' and table_name = '` + table + `'`
+	where table_schema = '` + p.cfg.DBName + `' and table_name = '` + table + `'`
 	rows, err := p.db.Query(sqltext)
 	if err != nil {
 		log.Error("Error executing query:", err)
@@ -186,9 +187,19 @@ func (p *MysqlHandler) openDB() error {
 		return fmt.Errorf("parse dbconfig.maxidletime [%s] failed: %s", p.Dbconfig.MaxIdleTime, err)
 	}
 
+	//解析DSN字符串
+	cfg, err := mysql.ParseDSN(p.Dbconfig.Dsn[0])
+	if err != nil {
+		log.Error("parse dsn failed:", err)
+		return err
+	}
+	p.cfg = cfg
+	// log.Debugf("mysql cfg: %#v", cfg)
+
+	//打开数据库连接
 	db, err := sql.Open(p.Dbconfig.Dbtype, p.Dbconfig.Dsn[0])
 	if err != nil {
-		log.Error("Error open database:", err)
+		log.Error("open database failed:", err)
 		return err
 	}
 
@@ -209,7 +220,7 @@ func (p *MysqlHandler) openDB() error {
 		return err
 	}
 
-	log.Infof("ping mysql [%s] success", p.Dbconfig.Dsn[0])
+	log.Infof("ping mysql [%s] success", p.cfg.Addr)
 	p.db = db
 	return nil
 }
