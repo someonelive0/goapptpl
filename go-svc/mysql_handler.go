@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
 	"database/sql"
+	"fmt"
 	"net/url"
 	"strings"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gofiber/fiber/v3"
@@ -11,7 +14,8 @@ import (
 )
 
 type MysqlHandler struct {
-	Dbconfig DBConfig
+	Dbconfig *DBConfig
+	db       *sql.DB
 }
 
 // r := app.Group("/mysql")
@@ -99,15 +103,13 @@ func (p *MysqlHandler) tableHandler(c fiber.Ctx) error {
 
 func (p *MysqlHandler) sqlHandler(c fiber.Ctx, sqltext string) error {
 	log.Tracef("/mysql sql: %s\n", sqltext)
-	db, err := sql.Open(p.Dbconfig.Dbtype, p.Dbconfig.Dsn[0])
-	if err != nil {
-		log.Error("Error open database:", err)
-		c.WriteString(err.Error())
-		return err
+	if p.db == nil {
+		if err := p.openDB(); err != nil {
+			return err
+		}
 	}
-	defer db.Close()
 
-	rows, err := db.Query(sqltext)
+	rows, err := p.db.Query(sqltext)
 	if err != nil {
 		log.Error("Error executing query:", err)
 		c.WriteString(err.Error())
@@ -144,16 +146,15 @@ func (p *MysqlHandler) sqlHandler(c fiber.Ctx, sqltext string) error {
 
 // get columns of table to string with ',' split
 func (p *MysqlHandler) getColumns(table string) (string, error) {
-	db, err := sql.Open(p.Dbconfig.Dbtype, p.Dbconfig.Dsn[0])
-	if err != nil {
-		log.Error("Error open database:", err)
-		return "", err
+	if p.db == nil {
+		if err := p.openDB(); err != nil {
+			return "", err
+		}
 	}
-	defer db.Close()
 
 	sqltext := `select group_concat(column_name) from INFORMATION_SCHEMA.COLUMNS
 	where table_schema = 'idss_dsmcp' and table_name = '` + table + `'`
-	rows, err := db.Query(sqltext)
+	rows, err := p.db.Query(sqltext)
 	if err != nil {
 		log.Error("Error executing query:", err)
 		return "", err
@@ -176,4 +177,46 @@ func (p *MysqlHandler) getColumns(table string) (string, error) {
 	}
 
 	return columns, nil
+}
+
+func (p *MysqlHandler) openDB() error {
+	//将空闲时间字符串解析为time.Duration类型
+	MaxIdleDuration, err := time.ParseDuration(p.Dbconfig.MaxIdleTime)
+	if err != nil {
+		return fmt.Errorf("parse dbconfig.maxidletime [%s] failed: %s", p.Dbconfig.MaxIdleTime, err)
+	}
+
+	db, err := sql.Open(p.Dbconfig.Dbtype, p.Dbconfig.Dsn[0])
+	if err != nil {
+		log.Error("Error open database:", err)
+		return err
+	}
+
+	//设置最大开放连接数，注意该值为小于0或等于0指的是无限制连接数
+	db.SetMaxOpenConns(p.Dbconfig.MaxOpenConns)
+
+	//设置空闲连接数，小于等于0表示无限制
+	db.SetMaxIdleConns(p.Dbconfig.MaxIdleConns)
+
+	//设置最大空闲超时
+	db.SetConnMaxIdleTime(MaxIdleDuration)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err = db.PingContext(ctx)
+	if err != nil {
+		log.Errorf("ping mysql [%s] failed: %s", p.Dbconfig.Dsn[0], err)
+		return err
+	}
+
+	log.Infof("ping mysql [%s] success", p.Dbconfig.Dsn[0])
+	p.db = db
+	return nil
+}
+
+func (p *MysqlHandler) Close() error {
+	if p.db != nil {
+		return p.db.Close()
+	}
+	return nil
 }

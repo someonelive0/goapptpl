@@ -117,7 +117,7 @@ func main() {
 	AddMinioHandler(app)
 	// AddMinioHandler1(app.Group("/minio"))
 
-	mysqlHdl := MysqlHandler{Dbconfig: myconfig.MysqlConfig}
+	mysqlHdl := MysqlHandler{Dbconfig: &myconfig.MysqlConfig}
 	mysqlHdl.AddRouter(app.Group("/mysql"))
 
 	// // GET /flights/LAX-SFO
