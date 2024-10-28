@@ -12,7 +12,7 @@ type ApiServer struct {
 	app      *fiber.App
 }
 
-func (p *ApiServer) Start() {
+func (p *ApiServer) Start() error {
 	app := fiber.New(fiber.Config{
 		CaseSensitive: true,
 		StrictRouting: true,
@@ -111,15 +111,27 @@ func (p *ApiServer) Start() {
 	// log.Debug("config: %s\n", data)
 
 	p.app = app
-	log.Fatal(app.Listen("[::]:3000", fiber.ListenConfig{
+
+	// 正常时阻塞在这里
+	err := app.Listen("[::]:3000", fiber.ListenConfig{
 		CertFile:    "etc/cert.pem",
 		CertKeyFile: "etc/key.pem",
-	}))
+	})
+	if err != nil {
+		log.Fatalf("api server start error: %s", err.Error())
+		return err
+	}
+
+	log.Debug("api server stop")
+	return nil
 }
 
-func (p *ApiServer) Stop() {
+func (p *ApiServer) Stop() error {
 	if p.app != nil {
-		p.app.Shutdown()
+		err := p.app.ShutdownWithTimeout(2 * time.Second)
+		// err := p.app.Shutdown()
 		p.app = nil
+		return err
 	}
+	return nil
 }

@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"goapptol/utils"
 	"os"
+	"os/signal"
+	"sync"
+	"syscall"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -55,11 +58,45 @@ func init() {
 }
 
 func main() {
+	var done = make(chan bool, 2)
+	var wg sync.WaitGroup
 
 	// start api server of gofiber
-	apiServer := &ApiServer{Myconfig: myconfig}
-	apiServer.Start()
-	apiServer.Stop()
+	var apiServer = &ApiServer{Myconfig: myconfig}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		apiServer.Start()
+	}()
 
+	// set signal, when signaled then sent a message to done channel
+	setSignal(done)
+
+	// GracefullyExit, stop and wait all routines
+	gracefullyExit := func() {
+		log.Info("GracefullyExit")
+		apiServer.Stop()
+		wg.Wait()
+	}
+
+	// 主程序阻塞在这里，等待API Server启动失败，或者是Ctrl-C
+	<-done
+	gracefullyExit()
 	log.Infof("END... %v", time.Now().Format("2006-01-02 15:04:05"))
+}
+
+func setSignal(done chan bool) {
+	var signchan = make(chan os.Signal, 1)
+	signal.Notify(signchan, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	go func() {
+		s := <-signchan
+		switch s {
+		case syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT:
+			signal.Stop(signchan)
+			done <- true
+			log.Info("receive SIGNAL: ", s)
+		default:
+			log.Info("receive other signal, ignore", s)
+		}
+	}()
 }
