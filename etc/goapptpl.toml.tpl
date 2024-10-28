@@ -22,8 +22,8 @@ port = 3000
 
 [minio]
     addr = "localhost:9000"
-    user = "root"
-    password = "root"
+    user = "username"
+    password = "password"
     ssl = false
     # timeout of seconds, default 10s
     timeout = 10
@@ -35,7 +35,8 @@ port = 3000
     password = ""
 
 [log]
-    level = "debug"
+    # log level = trace|debug|info|warn|error|fatal|panic, default info
+    level = "info"
     path = "log"
     filename = "goapptpl.log"
     rotate_files = 7

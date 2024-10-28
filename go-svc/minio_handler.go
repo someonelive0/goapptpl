@@ -55,16 +55,14 @@ func (p *MinioHandler) bucketsHandler(c fiber.Ctx) error {
 		log.Errorf("ListBuckets failed: %v", err)
 		return err
 	}
-	// log.Debug("buckets %#v\n", buckets) // minioClient is now setup
 
 	c.Context().SetContentType("application/json")
 	data, _ := json.MarshalIndent(buckets, "", "  ")
 	return c.Send(data)
-
 }
 
 func (p *MinioHandler) objectsHandler(c fiber.Ctx) error {
-	log.Debug("/minio/bucket/:bucket/objects\n")
+	log.Debug("/minio/bucket/:bucket/objects")
 	if p.cli == nil {
 		if err := p.getMinioClient(); err != nil {
 			return err
@@ -85,7 +83,7 @@ func (p *MinioHandler) objectsHandler(c fiber.Ctx) error {
 	i := 0
 	for object := range objectCh {
 		if object.Err != nil {
-			fmt.Println(object.Err)
+			log.Errorf("ListObjects failed: %v", object.Err)
 			return c.SendString(object.Err.Error())
 		}
 		if i > 0 {
@@ -102,7 +100,7 @@ func (p *MinioHandler) objectsHandler(c fiber.Ctx) error {
 
 // GET /minio/bucket/:bucket/object/:object?mime=json|xml
 func (p *MinioHandler) objectInfoHandler(c fiber.Ctx) error {
-	log.Printf("/minio/bucket/:bucket/object/:object\n")
+	log.Debug("/minio/bucket/:bucket/object/:object")
 	bucket, _ := url.QueryUnescape(c.Params("bucket"))
 	object, _ := url.QueryUnescape(c.Params("object"))
 	// q := c.Queries()
@@ -146,10 +144,9 @@ func (p *MinioHandler) objectInfoHandler(c fiber.Ctx) error {
 }
 
 func (p *MinioHandler) objectHandler(c fiber.Ctx) error {
-	log.Printf("/minio/bucket/:bucket/object/:object\n")
+	log.Debug("/minio/bucket/:bucket/object/:object")
 	bucket, _ := url.QueryUnescape(c.Params("bucket"))
 	object, _ := url.QueryUnescape(c.Params("object"))
-	// object := c.Params("object")
 
 	if p.cli == nil {
 		if err := p.getMinioClient(); err != nil {
@@ -185,11 +182,11 @@ func (p *MinioHandler) getMinioClient() error {
 			Secure: p.Minioconfig.Ssl,
 		})
 	if err != nil {
-		log.Error("connect minio '%s' failed: %v", p.Minioconfig.Addr, err)
+		log.Errorf("connect minio '%s' failed: %v", p.Minioconfig.Addr, err)
 		return err
 	}
 
-	// log.Printf("minioClient %#v\n", minioClient) // minioClient is now setup
+	// log.Debugf("minioClient %#v\n", minioClient) // minioClient is now setup
 	p.cli = minioClient
 	return nil
 }
