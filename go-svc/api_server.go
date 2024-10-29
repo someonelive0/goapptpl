@@ -10,6 +10,8 @@ import (
 type ApiServer struct {
 	Myconfig *MyConfig
 	app      *fiber.App
+	mysqlHdl *MysqlHandler
+	minioHdl *MinioHandler
 }
 
 func (p *ApiServer) Start() error {
@@ -17,7 +19,7 @@ func (p *ApiServer) Start() error {
 		CaseSensitive: true,
 		StrictRouting: true,
 		Immutable:     true,
-		ServerHeader:  "gofiber3",
+		ServerHeader:  "goapptpl",
 		AppName:       "Test App v1.0.1",
 		ReadTimeout:   30 * time.Second,
 		WriteTimeout:  30 * time.Second,
@@ -29,10 +31,11 @@ func (p *ApiServer) Start() error {
 
 	// Uer Middleware
 	// Match any route
-	app.Use(func(c fiber.Ctx) error {
-		log.Trace("🥇 Any handler: " + c.Path())
-		return c.Next()
-	})
+	// app.Use(func(c fiber.Ctx) error {
+	// 	log.Trace("🥇 Any handler: " + c.Path())
+	// 	return c.Next()
+	// })
+	app.Use(p.authMiddleware)
 
 	// // Match all routes starting with /api
 	// app.Use("/api", func(c fiber.Ctx) error {
@@ -111,6 +114,8 @@ func (p *ApiServer) Start() error {
 	// log.Debug("config: %s\n", data)
 
 	p.app = app
+	p.mysqlHdl = &mysqlHdl
+	p.minioHdl = &minioHdl
 
 	// 正常时阻塞在这里
 	err := app.Listen("[::]:3000", fiber.ListenConfig{
@@ -131,7 +136,27 @@ func (p *ApiServer) Stop() error {
 		err := p.app.ShutdownWithTimeout(2 * time.Second)
 		// err := p.app.Shutdown()
 		p.app = nil
+		p.mysqlHdl.Close()
+		p.mysqlHdl = nil
 		return err
 	}
 	return nil
+}
+
+func (p *ApiServer) authMiddleware(c fiber.Ctx) error {
+	log.Trace("🥇 Auth handler: " + c.Path())
+
+	// err := jwtware.New(jwtware.Config{
+	// 	SigningKey: jwtware.SigningKey{Key: []byte("secret")},
+	// })
+	// if err != nil {
+	// 	log.Error("new jwtware error: %#v", err)
+	// }
+	// log.Infof("jwt: %#v", err)
+
+	// user := c.Locals("user").(*jwt.Token)
+	// claims := user.Claims.(jwt.MapClaims)
+	// log.Info(claims)
+
+	return c.Next()
 }

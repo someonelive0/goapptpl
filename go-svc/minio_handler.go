@@ -34,6 +34,7 @@ func (p *MinioHandler) AddRouter(r fiber.Router) error {
 	return nil
 }
 
+// GET /minio/buckets
 func (p *MinioHandler) bucketsHandler(c fiber.Ctx) error {
 	log.Debug("/minio/buckets")
 	if p.cli == nil {
@@ -61,6 +62,7 @@ func (p *MinioHandler) bucketsHandler(c fiber.Ctx) error {
 	return c.Send(data)
 }
 
+// GET /minio/bucket/:bucket/objects
 func (p *MinioHandler) objectsHandler(c fiber.Ctx) error {
 	log.Debug("/minio/bucket/:bucket/objects")
 	if p.cli == nil {
@@ -98,7 +100,7 @@ func (p *MinioHandler) objectsHandler(c fiber.Ctx) error {
 	return nil
 }
 
-// GET /minio/bucket/:bucket/object/:object?mime=json|xml
+// GET /minio/bucket/:bucket/object-meta/:object?mime=json|xml
 func (p *MinioHandler) objectInfoHandler(c fiber.Ctx) error {
 	log.Debug("/minio/bucket/:bucket/object/:object")
 	bucket, _ := url.QueryUnescape(c.Params("bucket"))
@@ -143,6 +145,7 @@ func (p *MinioHandler) objectInfoHandler(c fiber.Ctx) error {
 	}
 }
 
+// GET /minio/bucket/:bucket/object/:object
 func (p *MinioHandler) objectHandler(c fiber.Ctx) error {
 	log.Debug("/minio/bucket/:bucket/object/:object")
 	bucket, _ := url.QueryUnescape(c.Params("bucket"))

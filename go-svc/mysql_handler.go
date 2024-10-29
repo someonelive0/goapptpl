@@ -4,13 +4,17 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"io"
 	"net/url"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/gofiber/fiber/v3"
 	log "github.com/sirupsen/logrus"
+	"github.com/xuri/excelize/v2"
 )
 
 type MysqlHandler struct {
@@ -30,6 +34,7 @@ func (p *MysqlHandler) AddRouter(r fiber.Router) error {
 	return nil
 }
 
+// GET /mysql/tables
 func (p *MysqlHandler) tablesHandler(c fiber.Ctx) error {
 	sqltext := `
 	select json_object(
@@ -52,6 +57,7 @@ func (p *MysqlHandler) tablesHandler(c fiber.Ctx) error {
 	return p.sqlHandler(c, sqltext)
 }
 
+// GET /mysql/table/:table/columns
 func (p *MysqlHandler) columnsHandler(c fiber.Ctx) error {
 	table, _ := url.QueryUnescape(c.Params("table"))
 	sqltext := `
@@ -75,6 +81,7 @@ func (p *MysqlHandler) columnsHandler(c fiber.Ctx) error {
 	return p.sqlHandler(c, sqltext)
 }
 
+// GET /mysql/table/:table?mime=excel
 func (p *MysqlHandler) tableHandler(c fiber.Ctx) error {
 	table, _ := url.QueryUnescape(c.Params("table"))
 	// columns := "id,api_id,app_id,hostname,buz_source,asset_name,api_method,api_endpoint,content_type,module_code,department_id,business_id,description,follow,monitor_cover,fever,asset_state,asset_value,sen_fever,discovery_time,risk_level,carrier_type,validate_time,ext_info,merge_state,check_state,tenant_id,create_user,create_time,update_user,update_time,api_no,pod,resource_pool,asset_code"
@@ -99,9 +106,45 @@ func (p *MysqlHandler) tableHandler(c fiber.Ctx) error {
 	sqltext += `	) as json 
 	from ` + table + ` limit ` + limit
 
-	return p.sqlHandler(c, sqltext)
+	mime := c.Query("mime", "json") // if Queries params mime is not set, default to json
+	switch mime {
+	case "json":
+		return p.sqlHandler(c, sqltext)
+
+	case "excel":
+		filename := table + ".xlsx"
+		ch := make(chan string)
+		go p.sql2chan(ch, sqltext)
+
+		f := excelize.NewFile()
+		index, _ := f.NewSheet("Sheet2")              // 创建一个工作表
+		f.SetCellValue("Sheet2", "A1", "JSON STRING") // 设置单元格的值
+
+		i := 2 // 从第二行开始写入数据
+		for jsonstr := range ch {
+			// log.Debugf("excel %s: %s", "A"+strconv.Itoa(i), jsonstr)
+			f.SetCellValue("Sheet2", "A"+strconv.Itoa(i), jsonstr)
+			i++
+		}
+
+		f.SetActiveSheet(index) // 设置工作簿的默认工作表
+		if err := f.SaveAs("log/" + filename); err != nil {
+			fmt.Println(err)
+		}
+
+		c.Attachment(filename)
+		fp, _ := os.Open("log/" + filename)
+		_, err = io.Copy(c, fp)
+		return err
+
+	default:
+		c.Status(400)
+		c.SendString(fmt.Sprintf("mime '%s' not supported", mime))
+		return nil
+	}
 }
 
+// write sql result to fiber response
 func (p *MysqlHandler) sqlHandler(c fiber.Ctx, sqltext string) error {
 	log.Tracef("/mysql sql: %s\n", sqltext)
 	if p.db == nil {
@@ -142,6 +185,41 @@ func (p *MysqlHandler) sqlHandler(c fiber.Ctx, sqltext string) error {
 		return err
 	}
 
+	return nil
+}
+
+// write sql result to channel
+func (p *MysqlHandler) sql2chan(ch chan string, sqltext string) error {
+	log.Tracef("/mysql sql: %s\n", sqltext)
+	if p.db == nil {
+		if err := p.openDB(); err != nil {
+			return err
+		}
+	}
+
+	rows, err := p.db.Query(sqltext)
+	if err != nil {
+		log.Error("Error executing query:", err)
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var jsonstr string
+		err = rows.Scan(&jsonstr)
+		if err != nil {
+			log.Error("Error scanning row:", err)
+			continue
+		}
+		ch <- jsonstr
+	}
+
+	if err = rows.Err(); err != nil {
+		log.Error("Error iterating through rows:", err)
+		return err
+	}
+
+	close(ch)
 	return nil
 }
 
