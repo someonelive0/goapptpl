@@ -3,12 +3,10 @@ package main
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/url"
 	"os"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -16,7 +14,8 @@ import (
 	"github.com/go-sql-driver/mysql"
 	"github.com/gofiber/fiber/v3"
 	log "github.com/sirupsen/logrus"
-	"github.com/xuri/excelize/v2"
+
+	"goapptol/utils"
 )
 
 type MysqlHandler struct {
@@ -33,10 +32,19 @@ func (p *MysqlHandler) AddRouter(r fiber.Router) error {
 	r.Get("/table/:table/columns", p.columnsHandler)
 	r.Get("/table/:table", p.tableHandler)
 
+	//解析DSN字符串
+	cfg, err := mysql.ParseDSN(p.Dbconfig.Dsn[0])
+	if err != nil {
+		log.Error("parse dsn failed:", err)
+		return err
+	}
+	p.cfg = cfg
+	// log.Debugf("mysql cfg: %#v", cfg)
+
 	return nil
 }
 
-// GET /mysql/tables
+// GET /mysql/tables?mime=excel|json
 func (p *MysqlHandler) tablesHandler(c fiber.Ctx) error {
 	sqltext := `
 	select json_object(
@@ -56,10 +64,37 @@ func (p *MysqlHandler) tablesHandler(c fiber.Ctx) error {
 	from INFORMATION_SCHEMA.TABLES
 	where table_schema = '` + p.cfg.DBName + `'`
 
-	return p.sqlHandler(c, sqltext)
+	mime := c.Query("mime", "json") // if Queries params mime is not set, default to json
+	switch mime {
+	case "json":
+		return p.sqlHandler(c, sqltext)
+
+	case "excel":
+		filename := p.cfg.DBName + "-tables.xlsx"
+		sheetname := p.cfg.DBName + " tables"
+		ch := make(chan string, 100)
+		go p.sql2chan(ch, sqltext)
+
+		if err := utils.Json2excel(ch, sheetname, "log/"+filename); err != nil {
+			return err
+		}
+
+		c.Attachment(filename)
+		fp, err := os.Open("log/" + filename)
+		if err != nil {
+			return err
+		}
+		_, err = io.Copy(c, fp)
+		return err
+
+	default:
+		c.Status(400)
+		c.SendString(fmt.Sprintf("mime '%s' not supported", mime))
+		return nil
+	}
 }
 
-// GET /mysql/table/:table/columns
+// GET /mysql/table/:table/columns?mime=excel|json
 func (p *MysqlHandler) columnsHandler(c fiber.Ctx) error {
 	table, _ := url.QueryUnescape(c.Params("table"))
 	sqltext := `
@@ -80,12 +115,45 @@ func (p *MysqlHandler) columnsHandler(c fiber.Ctx) error {
 	from INFORMATION_SCHEMA.COLUMNS
 	where table_schema = '` + p.cfg.DBName + `' and table_name = '` + table + `'`
 
-	return p.sqlHandler(c, sqltext)
+	mime := c.Query("mime", "json") // if Queries params mime is not set, default to json
+	switch mime {
+	case "json":
+		return p.sqlHandler(c, sqltext)
+
+	case "excel":
+		filename := table + "-columns.xlsx"
+		sheetname := table + " columns"
+		ch := make(chan string, 100)
+		go p.sql2chan(ch, sqltext)
+
+		if err := utils.Json2excel(ch, sheetname, "log/"+filename); err != nil {
+			return err
+		}
+
+		c.Attachment(filename)
+		fp, err := os.Open("log/" + filename)
+		if err != nil {
+			return err
+		}
+		_, err = io.Copy(c, fp)
+		return err
+
+	default:
+		c.Status(400)
+		c.SendString(fmt.Sprintf("mime '%s' not supported", mime))
+		return nil
+	}
 }
 
-// GET /mysql/table/:table?mime=excel
+// GET /mysql/table/:table?limit=10000&mime=excel|json
 func (p *MysqlHandler) tableHandler(c fiber.Ctx) error {
 	table, _ := url.QueryUnescape(c.Params("table"))
+	// TODO 当数据行数很大时，会占用很大内存，应该改为流式处理，这里限制最多10000行
+	limit := c.Query("limit", "100")
+	if i, err := strconv.Atoi(limit); err != nil || i > 10000 {
+		limit = "100"
+	}
+
 	// columns := "id,api_id,app_id,hostname,buz_source,asset_name,api_method,api_endpoint,content_type,module_code,department_id,business_id,description,follow,monitor_cover,fever,asset_state,asset_value,sen_fever,discovery_time,risk_level,carrier_type,validate_time,ext_info,merge_state,check_state,tenant_id,create_user,create_time,update_user,update_time,api_no,pod,resource_pool,asset_code"
 	columns, err := p.getColumns(table)
 	if err != nil {
@@ -93,7 +161,6 @@ func (p *MysqlHandler) tableHandler(c fiber.Ctx) error {
 		return err
 	}
 	columnArray := strings.Split(columns, ",")
-	limit := c.Query("limit", "100")
 
 	sqltext := `
 	select json_object(`
@@ -102,7 +169,7 @@ func (p *MysqlHandler) tableHandler(c fiber.Ctx) error {
 		if i > 0 {
 			sqltext += `,`
 		}
-		sqltext += `'` + col + `',` + col
+		sqltext += `'` + col + `', '` + col + `'`
 	}
 
 	sqltext += `	) as json 
@@ -111,64 +178,24 @@ func (p *MysqlHandler) tableHandler(c fiber.Ctx) error {
 	mime := c.Query("mime", "json") // if Queries params mime is not set, default to json
 	switch mime {
 	case "json":
+		// TODO 当表数据行数很大时，会占用很大内存，应该改为流式处理
 		return p.sqlHandler(c, sqltext)
 
 	case "excel":
 		filename := table + ".xlsx"
 		sheetname := table
-		ch := make(chan string)
+		ch := make(chan string, 100)
 		go p.sql2chan(ch, sqltext)
 
-		f := excelize.NewFile()
-		index, _ := f.NewSheet(sheetname) // 创建一个工作表
-		// f.SetCellValue(sheetname, "A1", "JSON STRING") // 设置单元格的值
-
-		m := make(map[string]interface{})
-		rows := 0
-		keys := make([]string, 0)
-
-		for jsonstr := range ch {
-			json.Unmarshal([]byte(jsonstr), &m)
-
-			if rows == 0 {
-				for k := range m {
-					keys = append(keys, k)
-				}
-				sort.Strings(keys)
-
-				// write header
-				for cols := range len(keys) {
-					// 从A,B,C...开始,当超过26个字母后，从AA,AB,AC...开始，或BA,BB,BC...开始
-					// cols%26 是取余数，cols/26 是取倍数
-					cell := string('A'+cols%26) + strconv.Itoa(rows+1)
-					if cols/26 > 0 {
-						cell = string('A'+(cols/26-1)) + cell
-					}
-					fmt.Printf("cols: %d:%d %s: %s\n", rows, cols, cell, keys[cols])
-					f.SetCellValue(sheetname, cell, keys[cols])
-				}
-
-				rows++
-			}
-
-			for cols := range len(keys) {
-				cell := string('A'+cols%26) + strconv.Itoa(rows+1)
-				if cols/26 > 0 {
-					cell = string('A'+(cols/26-1)) + cell
-				}
-				f.SetCellValue(sheetname, cell, m[keys[cols]])
-			}
-
-			rows++
-		}
-
-		f.SetActiveSheet(index) // 设置工作簿的默认工作表
-		if err := f.SaveAs("log/" + filename); err != nil {
-			fmt.Println(err)
+		if err = utils.Json2excel(ch, sheetname, "log/"+filename); err != nil {
+			return err
 		}
 
 		c.Attachment(filename)
-		fp, _ := os.Open("log/" + filename)
+		fp, err := os.Open("log/" + filename)
+		if err != nil {
+			return err
+		}
 		_, err = io.Copy(c, fp)
 		return err
 
@@ -299,15 +326,6 @@ func (p *MysqlHandler) openDB() error {
 	if err != nil {
 		return fmt.Errorf("parse dbconfig.maxidletime [%s] failed: %s", p.Dbconfig.MaxIdleTime, err)
 	}
-
-	//解析DSN字符串
-	cfg, err := mysql.ParseDSN(p.Dbconfig.Dsn[0])
-	if err != nil {
-		log.Error("parse dsn failed:", err)
-		return err
-	}
-	p.cfg = cfg
-	// log.Debugf("mysql cfg: %#v", cfg)
 
 	//打开数据库连接
 	db, err := sql.Open(p.Dbconfig.Dbtype, p.Dbconfig.Dsn[0])
