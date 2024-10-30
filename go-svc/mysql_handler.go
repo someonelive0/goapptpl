@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/url"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -113,18 +115,51 @@ func (p *MysqlHandler) tableHandler(c fiber.Ctx) error {
 
 	case "excel":
 		filename := table + ".xlsx"
+		sheetname := table
 		ch := make(chan string)
 		go p.sql2chan(ch, sqltext)
 
 		f := excelize.NewFile()
-		index, _ := f.NewSheet("Sheet2")              // 创建一个工作表
-		f.SetCellValue("Sheet2", "A1", "JSON STRING") // 设置单元格的值
+		index, _ := f.NewSheet(sheetname) // 创建一个工作表
+		// f.SetCellValue(sheetname, "A1", "JSON STRING") // 设置单元格的值
 
-		i := 2 // 从第二行开始写入数据
+		m := make(map[string]interface{})
+		rows := 0
+		keys := make([]string, 0)
+
 		for jsonstr := range ch {
-			// log.Debugf("excel %s: %s", "A"+strconv.Itoa(i), jsonstr)
-			f.SetCellValue("Sheet2", "A"+strconv.Itoa(i), jsonstr)
-			i++
+			json.Unmarshal([]byte(jsonstr), &m)
+
+			if rows == 0 {
+				for k := range m {
+					keys = append(keys, k)
+				}
+				sort.Strings(keys)
+
+				// write header
+				for cols := range len(keys) {
+					// 从A,B,C...开始,当超过26个字母后，从AA,AB,AC...开始，或BA,BB,BC...开始
+					// cols%26 是取余数，cols/26 是取倍数
+					cell := string('A'+cols%26) + strconv.Itoa(rows+1)
+					if cols/26 > 0 {
+						cell = string('A'+(cols/26-1)) + cell
+					}
+					fmt.Printf("cols: %d:%d %s: %s\n", rows, cols, cell, keys[cols])
+					f.SetCellValue(sheetname, cell, keys[cols])
+				}
+
+				rows++
+			}
+
+			for cols := range len(keys) {
+				cell := string('A'+cols%26) + strconv.Itoa(rows+1)
+				if cols/26 > 0 {
+					cell = string('A'+(cols/26-1)) + cell
+				}
+				f.SetCellValue(sheetname, cell, m[keys[cols]])
+			}
+
+			rows++
 		}
 
 		f.SetActiveSheet(index) // 设置工作簿的默认工作表
