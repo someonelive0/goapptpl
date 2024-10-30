@@ -2,8 +2,8 @@ root = "."
 tmp_dir = "tmp"
 
 [build]
-  cmd = "go build  ./go-svc"
-  bin = "go-svc.exe"
+  cmd = "go build -o gosvc.exe ./go-svc"
+  bin = "gosvc.exe"
   delay = 1000 # ms
   exclude_dir = [ "tmp", ".git", "log" ]
   include_ext = ["go", "tpl", "toml", "html"]

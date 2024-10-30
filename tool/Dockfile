@@ -1,0 +1,32 @@
+# cd /opt/goapptpl
+# docker build -t boco/goapptpl-svc -f Dockerfile .
+# docker run --net=host --name goapptpl-svc -d boco/goapptpl-svc
+# docker exec -it goapptpl-svc /bin/sh
+#
+
+
+#FROM scratch
+FROM alpine:latest
+MAINTAINER boco
+ARG goapptpl_HOME=/opt/goapptpl-1.0.0
+ENV goapptpl_HOME=${goapptpl_HOME}
+WORKDIR ${goapptpl_HOME}
+
+# Linux setting
+ENV TZ 'Asia/Shanghai'
+ENV LANG en_US.UTF-8
+ENV LANGUAGE en_US:en
+ENV LC_ALL en_US.UTF-8
+RUN mkdir -p ${goapptpl_HOME}
+RUN ln -sf ${goapptpl_HOME} /opt/goapptpl
+
+# Logger programs
+ADD goapptpl-svc ${goapptpl_HOME}/
+ADD etc/ ${goapptpl_HOME}/etc
+ADD tool/ ${goapptpl_HOME}/tool
+
+RUN adduser -G root -D boco
+RUN chown -R boco /opt/goapptpl-svc*
+RUN chmod +x ${goapptpl_HOME}/tool/*.sh
+
+ENTRYPOINT exec ${goapptpl_HOME}/goapptpl-svc
