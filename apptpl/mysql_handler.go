@@ -18,6 +18,10 @@ import (
 	"goapptol/utils"
 )
 
+const (
+	MYSQL_MAX_TIMEOUT = 30 // mysql max timeout in seconds
+)
+
 type MysqlHandler struct {
 	Dbconfig *DBConfig
 	db       *sql.DB       // mysql dbpool
@@ -415,7 +419,7 @@ func (p *MysqlHandler) openDB() error {
 
 	//设置最大空闲超时
 	db.SetConnMaxIdleTime(MaxIdleDuration)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), MYSQL_MAX_TIMEOUT*time.Second)
 	defer cancel()
 
 	err = db.PingContext(ctx)

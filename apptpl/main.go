@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"goapptol/utils"
 	"os"
 	"os/signal"
 	"sync"
@@ -11,6 +10,8 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+
+	"goapptol/utils"
 )
 
 var (

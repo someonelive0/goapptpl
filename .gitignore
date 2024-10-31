@@ -1,6 +1,7 @@
 /go.sum
-*.exe
 /tmp
 /etc/*.toml
 *.log.*
 log/*.xlsx
+*.exe
+goapptpl

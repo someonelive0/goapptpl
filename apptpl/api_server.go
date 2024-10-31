@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"strconv"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
@@ -18,20 +19,72 @@ type ApiServer struct {
 }
 
 func (p *ApiServer) Start() error {
+	log.Info("🚀 API server prepare to start...")
 	app := fiber.New(fiber.Config{
 		CaseSensitive: true,
 		StrictRouting: true,
 		Immutable:     true,
 		ServerHeader:  "goapptpl",
-		AppName:       "Test App v1.0.1",
+		AppName:       "Go App Template v" + utils.APP_VERSION,
 		ReadTimeout:   30 * time.Second,
 		WriteTimeout:  30 * time.Second,
 		ProxyHeader:   fiber.HeaderXForwardedFor,
 		UnescapePath:  false, // default false
 	})
 
-	log.Info("🚀 API server starting...")
+	p.initRoute(app)
 
+	// add MinioHandler
+	minioHdl := MinioHandler{Minioconfig: &p.Myconfig.MinioConfig}
+	minioHdl.AddRouter(app.Group("/minio"))
+
+	// add MysqlHandler
+	mysqlHdl := MysqlHandler{Dbconfig: &p.Myconfig.MysqlConfig}
+	mysqlHdl.AddRouter(app.Group("/mysql"))
+
+	// data, _ := json.MarshalIndent(app.Stack(), "", "  ")
+	// log.Debug(string(data))
+	// data, _ = json.MarshalIndent(app.Config(), "", "  ")
+	// log.Debug("config: %s\n", data)
+
+	p.app = app
+	p.mysqlHdl = &mysqlHdl
+	p.minioHdl = &minioHdl
+
+	// 正常时阻塞在这里
+	err := app.Listen("[::]:"+strconv.Itoa(int(p.Myconfig.Port)),
+		fiber.ListenConfig{
+			CertFile:              "etc/cert.pem",
+			CertKeyFile:           "etc/key.pem",
+			DisableStartupMessage: false,
+			EnablePrintRoutes:     false,
+			ListenerNetwork:       "tcp", // listen ipv4 and ipv6
+			BeforeServeFunc: func(app *fiber.App) error {
+				log.Info("🚀 API server starting...")
+				return nil
+			},
+		})
+	if err != nil {
+		log.Fatalf("api server start error: %s", err.Error())
+		return err
+	}
+
+	log.Debug("api server stop")
+	return nil
+}
+
+func (p *ApiServer) Stop() error {
+	if p.app != nil {
+		err := p.app.ShutdownWithTimeout(2 * time.Second)
+		// err := p.app.Shutdown()
+		p.app = nil
+		p.mysqlHdl.Close()
+		p.mysqlHdl = nil
+		return err
+	}
+	return nil
+}
+func (p *ApiServer) initRoute(app *fiber.App) error {
 	// Uer Middleware
 	// Match any route
 	// app.Use(func(c fiber.Ctx) error {
@@ -80,6 +133,9 @@ func (p *ApiServer) Start() error {
 	// app.GET("/config", handler.handleConfig)
 	// app.GET("/health", handler.handleHealth)
 	// app.GET("/cache", handler.handleCache)
+	app.Get("/", func(c fiber.Ctx) error {
+		return fiber.NewError(500, "Custom error message")
+	})
 	app.Get("/version", func(c fiber.Ctx) error {
 		return c.SendString(utils.Version("goapptpl")) // => ✋ versoin
 	})
@@ -88,51 +144,11 @@ func (p *ApiServer) Start() error {
 		return c.Send(b)
 	})
 
-	// add MinioHandler
-	minioHdl := MinioHandler{Minioconfig: &p.Myconfig.MinioConfig}
-	minioHdl.AddRouter(app.Group("/minio"))
-
-	// add MysqlHandler
-	mysqlHdl := MysqlHandler{Dbconfig: &p.Myconfig.MysqlConfig}
-	mysqlHdl.AddRouter(app.Group("/mysql"))
-
 	// Or extend your config for customization
 	// Assign the middleware to /metrics
 	// and change the Title to `MyService Metrics Page`
 	// app.Get("/metrics", monitor.New())
 
-	// data, _ := json.MarshalIndent(app.Stack(), "", "  ")
-	// log.Debug(string(data))
-	// data, _ = json.MarshalIndent(app.Config(), "", "  ")
-	// log.Debug("config: %s\n", data)
-
-	p.app = app
-	p.mysqlHdl = &mysqlHdl
-	p.minioHdl = &minioHdl
-
-	// 正常时阻塞在这里
-	err := app.Listen("[::]:3000", fiber.ListenConfig{
-		CertFile:    "etc/cert.pem",
-		CertKeyFile: "etc/key.pem",
-	})
-	if err != nil {
-		log.Fatalf("api server start error: %s", err.Error())
-		return err
-	}
-
-	log.Debug("api server stop")
-	return nil
-}
-
-func (p *ApiServer) Stop() error {
-	if p.app != nil {
-		err := p.app.ShutdownWithTimeout(2 * time.Second)
-		// err := p.app.Shutdown()
-		p.app = nil
-		p.mysqlHdl.Close()
-		p.mysqlHdl = nil
-		return err
-	}
 	return nil
 }
 
