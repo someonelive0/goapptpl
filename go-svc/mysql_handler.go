@@ -240,9 +240,9 @@ func (p *MysqlHandler) tableHandler(c fiber.Ctx) error {
 
 	for i, col := range columnArray {
 		if i > 0 {
-			sqltext += `,`
+			sqltext += ","
 		}
-		sqltext += `'` + col + `', '` + col + `'`
+		sqltext += "'" + col + "', `" + col + "`"
 	}
 
 	sqltext += `	) as json 
