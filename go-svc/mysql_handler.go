@@ -30,6 +30,7 @@ func (p *MysqlHandler) AddRouter(r fiber.Router) error {
 
 	r.Get("/tables", p.tablesHandler)
 	r.Get("/table/:table/columns", p.columnsHandler)
+	r.Get("/table/:table/indexs", p.indexsHandler)
 	r.Get("/table/:table", p.tableHandler)
 
 	//解析DSN字符串
@@ -114,6 +115,7 @@ func (p *MysqlHandler) columnsHandler(c fiber.Ctx) error {
 		) as json 
 	from INFORMATION_SCHEMA.COLUMNS
 	where table_schema = '` + p.cfg.DBName + `' and table_name = '` + table + `'`
+	sqltext += ` order by ordinal_position`
 
 	mime := c.Query("mime", "json") // if Queries params mime is not set, default to json
 	switch mime {
@@ -123,6 +125,77 @@ func (p *MysqlHandler) columnsHandler(c fiber.Ctx) error {
 	case "excel":
 		filename := table + "-columns.xlsx"
 		sheetname := table + " columns"
+		ch := make(chan string, 100)
+		go p.sql2chan(ch, sqltext)
+
+		if err := utils.Json2excel(ch, sheetname, "log/"+filename); err != nil {
+			return err
+		}
+
+		c.Attachment(filename)
+		fp, err := os.Open("log/" + filename)
+		if err != nil {
+			return err
+		}
+		_, err = io.Copy(c, fp)
+		return err
+
+	default:
+		c.Status(400)
+		c.SendString(fmt.Sprintf("mime '%s' not supported", mime))
+		return nil
+	}
+}
+
+// GET /mysql/table/:table/columns?mime=excel|json
+func (p *MysqlHandler) indexsHandler(c fiber.Ctx) error {
+	table, _ := url.QueryUnescape(c.Params("table"))
+	sqltext := fmt.Sprintf(`
+	select json_object(
+		'table_catalog', table_catalog,
+		'table_schema', table_schema,
+		'table_name', table_name,
+		'index_name', index_name, 
+		'index_type', index_type,
+		'index_schema', index_schema,
+		'nullable', nullable,
+		'is_visible', is_visible,
+		'non_unique', non_unique,
+		'comment', comment,
+		'index_comment', index_comment,
+		'collation', collation,
+		'comment', comment,
+		'cardinality', cardinality
+		) as json
+	from (
+		select
+			table_catalog,
+			table_schema,
+			table_name,
+			index_name,
+			index_type,
+			index_schema,
+			nullable,
+			is_visible,
+			non_unique,
+			comment,
+			index_comment,
+			collation,
+			cardinality,
+			GROUP_CONCAT(column_name ORDER BY seq_in_index) AS columns
+			from information_schema.statistics
+		where table_schema = '%s' and table_name = '%s'
+		group by table_schema, table_name, index_name
+	) as b`, p.cfg.DBName, table)
+
+	mime := c.Query("mime", "json") // if Queries params mime is not set, default to json
+	switch mime {
+	case "json":
+		return p.sqlHandler(c, sqltext)
+
+	case "excel":
+		filename := table + "-indexs.xlsx"
+		sheetname := table + " indexs"
 		ch := make(chan string, 100)
 		go p.sql2chan(ch, sqltext)
 

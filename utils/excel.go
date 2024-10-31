@@ -16,9 +16,13 @@ func Json2excel(ch chan string, sheetname, filename string) error {
 	f := excelize.NewFile()
 	defer f.Close()
 
+	// the sheet name length has the 31 characters limit
+	if len(sheetname) > 31 {
+		sheetname = sheetname[:31]
+	}
 	index, err := f.NewSheet(sheetname) // 创建一个工作表
 	if err != nil {
-		log.Errorf("Create sheet '%s' failed: %v", sheetname, err)
+		log.Errorf("excel create sheet '%s' failed: %v", sheetname, err)
 		return err
 	}
 
