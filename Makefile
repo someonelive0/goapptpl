@@ -8,13 +8,13 @@ PARAMS=-ldflags '-s -w -extldflags "-static"'
 # upx is a tool to compress executable program.
 UPX=upx
 
-PRGS=gosvc
+PRGS=goapptpl
 
 
 all:	$(PRGS)
 
-gosvc:
-	$(GO) build $(PARAMS) -o $@ ./go-svc
+goapptpl:
+	$(GO) build $(PARAMS) -o $@ ./apptpl
 
 
 clean:

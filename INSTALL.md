@@ -19,7 +19,7 @@ make
 
 配置文件 etc/goapptpl.toml
 
-./gosvc
+./goapptpl
 
 # 4. 防火墙
 

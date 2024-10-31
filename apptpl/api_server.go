@@ -1,10 +1,13 @@
 package main
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
 	log "github.com/sirupsen/logrus"
+
+	"goapptol/utils"
 )
 
 type ApiServer struct {
@@ -65,43 +68,33 @@ func (p *ApiServer) Start() error {
 	// 	return c.Next()
 	// })
 
-	// // API routes
-	// // GET /api/register
-	// app.Get("/api/*", func(c fiber.Ctx) error {
-	// 	msg := fmt.Sprintf("✋ %s", c.Params("*"))
-	// 	return c.SendString(msg) // => ✋ register
-	// })
+	// API routes
+	// app.GET("/", handler.handleReadme)
+	// app.GET("/api", handler.handleApi)
+	// app.GET("/version", handler.handleVersion)
+	// app.GET("/status", handler.handleStatus)
+	// app.GET("/log", handler.handleLog)
+	// app.GET("/dump", handler.handleDump)
+	// app.GET("/errors", handler.handleErrors)
+	// app.GET("/statistic", handler.handleStatistic)
+	// app.GET("/config", handler.handleConfig)
+	// app.GET("/health", handler.handleHealth)
+	// app.GET("/cache", handler.handleCache)
+	app.Get("/version", func(c fiber.Ctx) error {
+		return c.SendString(utils.Version("goapptpl")) // => ✋ versoin
+	})
+	app.Get("/config", func(c fiber.Ctx) error {
+		b, _ := json.Marshal(p.Myconfig)
+		return c.Send(b)
+	})
 
-	// AddMinioHandler(app)
+	// add MinioHandler
 	minioHdl := MinioHandler{Minioconfig: &p.Myconfig.MinioConfig}
 	minioHdl.AddRouter(app.Group("/minio"))
 
+	// add MysqlHandler
 	mysqlHdl := MysqlHandler{Dbconfig: &p.Myconfig.MysqlConfig}
 	mysqlHdl.AddRouter(app.Group("/mysql"))
-
-	// // GET /flights/LAX-SFO
-	// app.Get("/flights/:from-:to", func(c fiber.Ctx) error {
-	// 	msg := fmt.Sprintf("💸 From: %s, To: %s", c.Params("from"), c.Params("to"))
-	// 	return c.SendString(msg) // => 💸 From: LAX, To: SFO
-	// })
-
-	// // GET /dictionary.txt
-	// app.Get("/:file.:ext", func(c fiber.Ctx) error {
-	// 	msg := fmt.Sprintf("📃 %s.%s", c.Params("file"), c.Params("ext"))
-	// 	return c.SendString(msg) // => 📃 dictionary.txt
-	// })
-
-	// // GET /john/75
-	// app.Get("/:name/:age/:gender?", func(c fiber.Ctx) error {
-	// 	msg := fmt.Sprintf("👴 %s is %s years old", c.Params("name"), c.Params("age"))
-	// 	return c.SendString(msg) // => 👴 john is 75 years old
-	// })
-
-	// // GET /john
-	// app.Get("/:name", func(c fiber.Ctx) error {
-	// 	msg := fmt.Sprintf("Hello, %s 👋!", c.Params("name"))
-	// 	return c.SendString(msg) // => Hello john 👋!
-	// })
 
 	// Or extend your config for customization
 	// Assign the middleware to /metrics
