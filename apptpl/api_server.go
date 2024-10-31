@@ -16,10 +16,11 @@ type ApiServer struct {
 	app      *fiber.App
 	mysqlHdl *MysqlHandler
 	minioHdl *MinioHandler
+	redisHdl *RedisHandler
 }
 
 func (p *ApiServer) Start() error {
-	log.Info("🚀 API server prepare to start...")
+	log.Info("🚀 API server prepare...")
 	app := fiber.New(fiber.Config{
 		CaseSensitive: true,
 		StrictRouting: true,
@@ -42,6 +43,10 @@ func (p *ApiServer) Start() error {
 	mysqlHdl := MysqlHandler{Dbconfig: &p.Myconfig.MysqlConfig}
 	mysqlHdl.AddRouter(app.Group("/mysql"))
 
+	// add MysqlHandler
+	redisHdl := RedisHandler{Redisconfig: &p.Myconfig.RedisConfig}
+	redisHdl.AddRouter(app.Group("/redis"))
+
 	// data, _ := json.MarshalIndent(app.Stack(), "", "  ")
 	// log.Debug(string(data))
 	// data, _ = json.MarshalIndent(app.Config(), "", "  ")
@@ -50,6 +55,7 @@ func (p *ApiServer) Start() error {
 	p.app = app
 	p.mysqlHdl = &mysqlHdl
 	p.minioHdl = &minioHdl
+	p.redisHdl = &redisHdl
 
 	// 正常时阻塞在这里
 	err := app.Listen("[::]:"+strconv.Itoa(int(p.Myconfig.Port)),
@@ -80,10 +86,14 @@ func (p *ApiServer) Stop() error {
 		p.app = nil
 		p.mysqlHdl.Close()
 		p.mysqlHdl = nil
+		p.minioHdl = nil
+		p.redisHdl.Close()
+		p.redisHdl = nil
 		return err
 	}
 	return nil
 }
+
 func (p *ApiServer) initRoute(app *fiber.App) error {
 	// Uer Middleware
 	// Match any route

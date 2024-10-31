@@ -34,9 +34,11 @@ port = 3000
 
 
 [redis]
-    host = "localhost"
-    port = 6379
+    addr = "localhost:6379"
     password = ""
+    db = 0
+    timeout = 10
+
 
 [log]
     # log level = trace|debug|info|warn|error|fatal|panic, default info

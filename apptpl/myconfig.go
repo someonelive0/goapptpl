@@ -21,8 +21,15 @@ type DBConfig struct {
 type MinioConfig struct {
 	Addr     string `toml:"addr" json:"addr"`
 	User     string `toml:"user" json:"user"`
-	Password string `toml:"password" json:"password"`
+	Password string `toml:"password" json:"-"`
 	Ssl      bool   `toml:"ssl" json:"ssl"`
+	Timeout  uint   `toml:"timeout" json:"timeout"`
+}
+
+type RedisConfig struct {
+	Addr     string `toml:"addr" json:"addr"`
+	Password string `toml:"password" json:"-"`
+	Db       uint   `toml:"db" json:"db"`
 	Timeout  uint   `toml:"timeout" json:"timeout"`
 }
 
@@ -44,6 +51,7 @@ type MyConfig struct {
 
 	MysqlConfig DBConfig    `toml:"mysql" json:"mysql"`
 	MinioConfig MinioConfig `toml:"minio" json:"minio"`
+	RedisConfig RedisConfig `toml:"redis" json:"redis"`
 	LogConfig   LogConfig   `toml:"log" json:"log"`
 }
 

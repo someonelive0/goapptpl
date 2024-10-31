@@ -75,7 +75,7 @@ SELECT JSON_OBJECT(
 Air 是一款便捷的工具，每当源代码发生更改时，它都会自动重启你的 Go 应用程序，从而使你的开发过程更快、更有效率。
 
 ```
-go get -u github.com/cosmtrek/air
+go install github.com/air-verse/air@latest
 ```
 
 要在 Fiber 项目中使用 Air，请按照以下步骤操作
