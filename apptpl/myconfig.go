@@ -52,6 +52,7 @@ type MyConfig struct {
 	MysqlConfig DBConfig    `toml:"mysql" json:"mysql"`
 	MinioConfig MinioConfig `toml:"minio" json:"minio"`
 	RedisConfig RedisConfig `toml:"redis" json:"redis"`
+	CkConfig    DBConfig    `toml:"clickhouse" json:"clickhouse"`
 	LogConfig   LogConfig   `toml:"log" json:"log"`
 }
 

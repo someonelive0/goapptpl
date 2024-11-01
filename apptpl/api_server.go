@@ -17,6 +17,7 @@ type ApiServer struct {
 	mysqlHdl *MysqlHandler
 	minioHdl *MinioHandler
 	redisHdl *RedisHandler
+	ckHdl    *ClickhouseHandler
 }
 
 func (p *ApiServer) Start() error {
@@ -35,17 +36,21 @@ func (p *ApiServer) Start() error {
 
 	p.initRoute(app)
 
-	// add MinioHandler
-	minioHdl := MinioHandler{Minioconfig: &p.Myconfig.MinioConfig}
-	minioHdl.AddRouter(app.Group("/minio"))
-
 	// add MysqlHandler
 	mysqlHdl := MysqlHandler{Dbconfig: &p.Myconfig.MysqlConfig}
 	mysqlHdl.AddRouter(app.Group("/mysql"))
 
-	// add MysqlHandler
+	// add MinioHandler
+	minioHdl := MinioHandler{Minioconfig: &p.Myconfig.MinioConfig}
+	minioHdl.AddRouter(app.Group("/minio"))
+
+	// add RedisHandler
 	redisHdl := RedisHandler{Redisconfig: &p.Myconfig.RedisConfig}
 	redisHdl.AddRouter(app.Group("/redis"))
+
+	// add ClickhouseHandler
+	ckHdl := ClickhouseHandler{Dbconfig: &p.Myconfig.CkConfig}
+	ckHdl.AddRouter(app.Group("/clickhouse"))
 
 	// data, _ := json.MarshalIndent(app.Stack(), "", "  ")
 	// log.Debug(string(data))
@@ -56,6 +61,7 @@ func (p *ApiServer) Start() error {
 	p.mysqlHdl = &mysqlHdl
 	p.minioHdl = &minioHdl
 	p.redisHdl = &redisHdl
+	p.ckHdl = &ckHdl
 
 	// 正常时阻塞在这里
 	err := app.Listen("[::]:"+strconv.Itoa(int(p.Myconfig.Port)),
@@ -89,6 +95,8 @@ func (p *ApiServer) Stop() error {
 		p.minioHdl = nil
 		p.redisHdl.Close()
 		p.redisHdl = nil
+		p.ckHdl.Close()
+		p.ckHdl = nil
 		return err
 	}
 	return nil

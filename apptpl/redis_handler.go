@@ -82,7 +82,7 @@ func (p *RedisHandler) keyHandler(c fiber.Ctx) error {
 		log.Errorf("redis get key '%s' data type failed: %v", key, err)
 		return err
 	}
-	fmt.Println("datatype:", datatype)
+	log.Tracef("key datatype: %s", datatype)
 
 	// 根据数据类型获取key的值
 	switch datatype {
@@ -92,7 +92,7 @@ func (p *RedisHandler) keyHandler(c fiber.Ctx) error {
 			log.Errorf("redis get key '%s' failed: %v", key, err)
 			return err
 		}
-		log.Tracef("string key '%s' -> %#v\n", key, val)
+		// log.Tracef("string key '%s' -> %#v\n", key, val)
 
 		return c.JSON(val)
 
@@ -102,7 +102,7 @@ func (p *RedisHandler) keyHandler(c fiber.Ctx) error {
 			log.Errorf("redis get key '%s' failed: %v", key, err)
 			return err
 		}
-		log.Tracef("hash key '%s' -> %#v\n", key, val)
+		// log.Tracef("hash key '%s' -> %#v\n", key, val)
 
 		return c.JSON(val)
 
@@ -112,7 +112,7 @@ func (p *RedisHandler) keyHandler(c fiber.Ctx) error {
 			log.Errorf("redis get key '%s' failed: %v", key, err)
 			return err
 		}
-		log.Tracef("hash key '%s' -> %#v\n", key, val)
+		// log.Tracef("hash key '%s' -> %#v\n", key, val)
 
 		return c.JSON(val)
 
@@ -122,7 +122,7 @@ func (p *RedisHandler) keyHandler(c fiber.Ctx) error {
 			log.Errorf("redis get key '%s' failed: %v", key, err)
 			return err
 		}
-		log.Tracef("hash key '%s' -> %#v\n", key, val)
+		// log.Tracef("hash key '%s' -> %#v\n", key, val)
 
 		return c.JSON(val)
 
@@ -132,7 +132,7 @@ func (p *RedisHandler) keyHandler(c fiber.Ctx) error {
 			log.Errorf("redis get key '%s' failed: %v", key, err)
 			return err
 		}
-		log.Tracef("hash key '%s' -> %#v\n", key, val)
+		// log.Tracef("hash key '%s' -> %#v\n", key, val)
 
 		return c.JSON(val)
 
@@ -140,18 +140,6 @@ func (p *RedisHandler) keyHandler(c fiber.Ctx) error {
 		return fmt.Errorf("unknown key type: %s", datatype)
 	}
 
-	// val, err := p.cli.LPop(context.Background(), key).Result()
-	// if err != nil {
-	// 	log.Errorf("redis get key '%s' failed: %v", key, err)
-	// 	return err
-	// }
-	// fmt.Println("name:", val)
-
-	// return c.JSON(fiber.Map{
-	// 	key: val,
-	// })
-
-	return nil
 }
 
 func (p *RedisHandler) openRedis() error {
