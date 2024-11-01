@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/go-sql-driver/mysql"
@@ -237,12 +236,11 @@ func (p *MysqlHandler) tableHandler(c fiber.Ctx) error {
 		c.WriteString(err.Error())
 		return err
 	}
-	columnArray := strings.Split(columns, ",")
 
 	sqltext := `
 	select json_object(`
 
-	for i, col := range columnArray {
+	for i, col := range columns {
 		if i > 0 {
 			sqltext += ","
 		}
@@ -264,7 +262,8 @@ func (p *MysqlHandler) tableHandler(c fiber.Ctx) error {
 		ch := make(chan string, 100)
 		go p.sql2chan(ch, sqltext)
 
-		if err = utils.Json2excel(ch, sheetname, "log/"+filename); err != nil {
+		if err = utils.Json2excelWithColumn(ch,
+			columns, sheetname, "log/"+filename); err != nil {
 			return err
 		}
 
@@ -363,38 +362,39 @@ func (p *MysqlHandler) sql2chan(ch chan string, sqltext string) error {
 	return nil
 }
 
-// get columns of table to string with ',' split
-func (p *MysqlHandler) getColumns(table string) (string, error) {
+// get columns of table to string with ',' split. sort by ordinal_position
+func (p *MysqlHandler) getColumns(table string) ([]string, error) {
 	if p.db == nil {
 		if err := p.openDB(); err != nil {
-			return "", err
+			return nil, err
 		}
 	}
 
-	sqltext := fmt.Sprintf(`select group_concat(column_name) 
+	sqltext := fmt.Sprintf(`select column_name
 		from INFORMATION_SCHEMA.COLUMNS
 		where table_schema = '%s' and table_name = '%s'
 		order by ordinal_position`, p.cfg.DBName, table)
 	rows, err := p.db.Query(sqltext)
 	if err != nil {
 		log.Error("Error executing query:", err)
-		return "", err
+		return nil, err
 	}
 	defer rows.Close()
 
-	var columns string
+	var columns []string = make([]string, 0)
+	var column string
 	for rows.Next() {
-		err = rows.Scan(&columns)
+		err = rows.Scan(&column)
 		if err != nil {
 			log.Error("Error scanning row:", err)
 			continue
 		}
-		break // just get one row
+		columns = append(columns, column)
 	}
 
 	if err = rows.Err(); err != nil {
 		log.Error("Error iterating through rows:", err)
-		return "", err
+		return nil, err
 	}
 
 	return columns, nil

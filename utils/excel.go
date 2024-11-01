@@ -87,6 +87,74 @@ func Json2excel(ch chan string, sheetname, filename string) error {
 	return nil
 }
 
+// read json from chan string and write to excel with sheet name
+// TODO 当数据行数很大时，会占用很大内存，应该改为流式处理
+func Json2excelWithColumn(ch chan string, columns []string,
+	sheetname, filename string) error {
+
+	f := excelize.NewFile()
+	defer f.Close()
+
+	// the sheet name length has the 31 characters limit
+	if len(sheetname) > 31 {
+		sheetname = sheetname[:31]
+	}
+	index, err := f.NewSheet(sheetname) // 创建一个工作表
+	if err != nil {
+		log.Errorf("excel create sheet '%s' failed: %v", sheetname, err)
+		return err
+	}
+
+	// 填写表头，并设置表头样式
+	rows := 0
+	for cols := range len(columns) {
+		// 从A,B,C...开始,当超过26个字母后，从AA,AB,AC...开始，或BA,BB,BC...开始
+		// cols%26 是取余数，cols/26 是取倍数
+		// cell := string('A'+cols%26) + strconv.Itoa(rows+1)
+		cell := fmt.Sprintf("%c%d", 'A'+cols%26, rows+1)
+		if cols/26 > 0 {
+			cell = string('A'+(cols/26-1)) + cell
+		}
+		// fmt.Printf("cols: %d:%d %s: %s\n", rows, cols, cell, keys[cols])
+		if err = f.SetCellValue(sheetname, cell, columns[cols]); err != nil {
+			log.Warnf("SetCellValue header failed: %v", err)
+		}
+
+		// when last cell, set style
+		if cols == len(columns)-1 {
+			if err := SetHeaderStyle(f, sheetname, "A1", cell); err != nil {
+				log.Warnf("SetHeaderStyle failed: %v", err)
+			}
+		}
+	}
+	rows++ // 跳过第一行表头
+
+	m := make(map[string]interface{})
+	for jsonstr := range ch {
+		json.Unmarshal([]byte(jsonstr), &m)
+
+		// 填写数据
+		for cols := range len(columns) {
+			cell := string('A'+cols%26) + strconv.Itoa(rows+1)
+			if cols/26 > 0 {
+				cell = string('A'+(cols/26-1)) + cell
+			}
+			if err = f.SetCellValue(sheetname, cell, m[columns[cols]]); err != nil {
+				log.Warnf("SetCellValue failed: %v", err)
+			}
+		}
+
+		rows++
+	}
+
+	f.SetActiveSheet(index) // 设置工作簿的默认工作表
+	if err = f.SaveAs(filename); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // set style for header, from first cell to last cell
 // such as "sheet1", from "A1" to "Z1"
 func SetHeaderStyle(f *excelize.File, sheetname, firstcell, lastcell string) error {

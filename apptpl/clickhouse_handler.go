@@ -205,7 +205,8 @@ func (p *ClickhouseHandler) tableHandler(c fiber.Ctx) error {
 		ch := make(chan string, 100)
 		go p.sql2chan(ch, sqltext)
 
-		if err = utils.Json2excel(ch, sheetname, "log/"+filename); err != nil {
+		if err = utils.Json2excelWithColumn(ch,
+			columnArray, sheetname, "log/"+filename); err != nil {
 			return err
 		}
 
