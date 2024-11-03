@@ -31,7 +31,7 @@ func init() {
 		os.Exit(0)
 	}
 	utils.ShowBannerForApp("goapptpl", utils.APP_VERSION, utils.BUILD_TIME)
-	utils.Chdir2PrgPath()
+	utils.Chdir2PrgPath() // for debug then comment this line.
 	pwd, _ := utils.GetPrgDir()
 	fmt.Println("pwd:", pwd)
 
