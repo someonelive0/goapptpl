@@ -41,6 +41,17 @@ type LogConfig struct {
 	Rotate_mbytes uint   `toml:"rotate_mbytes" json:"rotate_mbytes"`
 }
 
+type NacosConfig struct {
+	Addr     string `toml:"addr" json:"addr"`
+	User     string `toml:"user" json:"user"`
+	Password string `toml:"password" json:"-"`
+	Timeout  uint   `toml:"timeout" json:"timeout"`
+	Enable   bool   `toml:"enable" json:"enable"`
+}
+
+/*
+ * MyConfig
+ */
 type MyConfig struct {
 	Filename string    `toml:"filename" json:"filename" xml:"filename,attr"`
 	LoadTime time.Time `toml:"load_time" json:"load_time" xml:"load_time,attr"`
@@ -53,6 +64,7 @@ type MyConfig struct {
 	MinioConfig MinioConfig `toml:"minio" json:"minio"`
 	RedisConfig RedisConfig `toml:"redis" json:"redis"`
 	CkConfig    DBConfig    `toml:"clickhouse" json:"clickhouse"`
+	NacosConfig NacosConfig `toml:"nacos" json:"nacos"`
 	LogConfig   LogConfig   `toml:"log" json:"log"`
 }
 

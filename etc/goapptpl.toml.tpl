@@ -58,6 +58,14 @@ port = 3000
     ]
 
 
+[nacos]
+    addr = "http://localhost:8848"
+    user = "nacos"
+    password = "nacos"
+    timeout = 10
+    enable = false
+
+
 [log]
     # log level = trace|debug|info|warn|error|fatal|panic, default info
     level = "info"

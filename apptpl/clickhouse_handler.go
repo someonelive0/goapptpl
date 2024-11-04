@@ -177,7 +177,6 @@ func (p *ClickhouseHandler) tableHandler(c fiber.Ctx) error {
 		return err
 	}
 	columnArray := strings.Split(columns, ",")
-	fmt.Printf("columns: %v\n", columnArray)
 
 	sqltext := `
 	select toJSONString(map( `

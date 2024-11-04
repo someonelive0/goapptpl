@@ -49,6 +49,7 @@ func (p *MysqlHandler) AddRouter(r fiber.Router) error {
 }
 
 // GET /mysql/tables?mime=excel|json
+// mysql json_object() 不保证字段顺序，所以excel格式化时，需要按顺序
 func (p *MysqlHandler) tablesHandler(c fiber.Ctx) error {
 	sqltext := `
 	select json_object(

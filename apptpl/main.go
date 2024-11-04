@@ -70,6 +70,17 @@ func main() {
 		apiServer.Start()
 	}()
 
+	// start nacos register
+	var nacosRegister = &NacosRegister{
+		Nacosconfig: &myconfig.NacosConfig,
+		Myconfig:    myconfig,
+	}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		nacosRegister.Regist()
+	}()
+
 	// set signal, when signaled then sent a message to done channel
 	setSignal(done)
 
@@ -77,6 +88,7 @@ func main() {
 	gracefullyExit := func() {
 		log.Info("GracefullyExit")
 		apiServer.Stop()
+		nacosRegister.Stop()
 		wg.Wait()
 	}
 
