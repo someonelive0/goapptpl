@@ -34,7 +34,7 @@ func (p *ClickhouseHandler) AddRouter(r fiber.Router) error {
 
 	r.Get("/tables", p.tablesHandler)
 	r.Get("/table/:table/columns", p.columnsHandler)
-	// r.Get("/table/:table/indexs", p.indexsHandler)
+	// r.Get("/table/:table/indexes", p.indexesHandler)
 	r.Get("/table/:table", p.tableHandler)
 
 	//解析DSN字符串

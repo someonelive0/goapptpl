@@ -20,6 +20,7 @@ type ApiServer struct {
 	minioHdl *MinioHandler
 	redisHdl *RedisHandler
 	ckHdl    *ClickhouseHandler
+	pgHdl    *PgHandler
 }
 
 func (p *ApiServer) Start() error {
@@ -54,6 +55,10 @@ func (p *ApiServer) Start() error {
 	ckHdl := ClickhouseHandler{Dbconfig: &p.Myconfig.CkConfig}
 	ckHdl.AddRouter(app.Group("/clickhouse"))
 
+	// add PgHandler
+	pgHdl := PgHandler{Dbconfig: &p.Myconfig.PgConfig}
+	pgHdl.AddRouter(app.Group("/postgresql"))
+
 	// data, _ := json.MarshalIndent(app.Stack(), "", "  ")
 	// log.Debug(string(data))
 	// data, _ = json.MarshalIndent(app.Config(), "", "  ")
@@ -64,6 +69,7 @@ func (p *ApiServer) Start() error {
 	p.minioHdl = &minioHdl
 	p.redisHdl = &redisHdl
 	p.ckHdl = &ckHdl
+	p.pgHdl = &pgHdl
 
 	// use CertFile and CertKeyFile to listen https
 	// 正常时阻塞在这里
@@ -120,6 +126,8 @@ func (p *ApiServer) Stop() error {
 		p.redisHdl = nil
 		p.ckHdl.Close()
 		p.ckHdl = nil
+		p.pgHdl.Close()
+		p.pgHdl = nil
 		return err
 	}
 	return nil

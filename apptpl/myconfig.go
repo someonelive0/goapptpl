@@ -64,6 +64,7 @@ type MyConfig struct {
 	MinioConfig MinioConfig `toml:"minio" json:"minio"`
 	RedisConfig RedisConfig `toml:"redis" json:"redis"`
 	CkConfig    DBConfig    `toml:"clickhouse" json:"clickhouse"`
+	PgConfig    DBConfig    `toml:"postgresql" json:"postgresql"`
 	NacosConfig NacosConfig `toml:"nacos" json:"nacos"`
 	LogConfig   LogConfig   `toml:"log" json:"log"`
 }

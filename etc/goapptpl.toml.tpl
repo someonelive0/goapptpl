@@ -58,6 +58,24 @@ port = 3000
     ]
 
 
+[postgresql]
+    dbtype = "postgres"
+    # 设置最大开放连接数，注意该值为小于0或等于0指的是无限制连接数
+    maxopenconns = 0
+    # 设置空闲连接数，将此值设置为小于或等于0将意味着不保留空闲连接，即立即关闭连接
+    maxidleconns = 10
+    # 连接池里面的连接最大空闲时长。
+    # 当连接持续空闲时长达到maxIdleTime后，该连接就会被关闭并从连接池移除，
+    # 哪怕当前空闲连接数已经小于SetMaxIdleConns(maxIdleConns)设置的值
+    maxidletime = "60s"
+
+    # Data Source Name
+    dsn = [
+      "postgres://postgres:password@localhost:5432/postgres?sslmode=disable",
+      "postgres://postgres:password@localhost:5432/postgres?sslmode=disable"
+    ]
+
+
 [nacos]
     addr = "http://localhost:8848"
     user = "nacos"
