@@ -1,7 +1,9 @@
 package main
 
 import (
+	"crypto/tls"
 	"encoding/json"
+	"net"
 	"strconv"
 	"time"
 
@@ -63,11 +65,32 @@ func (p *ApiServer) Start() error {
 	p.redisHdl = &redisHdl
 	p.ckHdl = &ckHdl
 
+	// use CertFile and CertKeyFile to listen https
 	// 正常时阻塞在这里
-	err := app.Listen("[::]:"+strconv.Itoa(int(p.Myconfig.Port)),
+	// err := app.Listen("[::]:"+strconv.Itoa(int(p.Myconfig.Port)),
+	// 	fiber.ListenConfig{
+	// 		CertFile:              "etc/cert.pem",
+	// 		CertKeyFile:           "etc/key.pem",
+	// 		DisableStartupMessage: false,
+	// 		EnablePrintRoutes:     false,
+	// 		ListenerNetwork:       "tcp", // listen ipv4 and ipv6
+	// 		BeforeServeFunc: func(app *fiber.App) error {
+	// 			log.Info("🚀 API server starting...")
+	// 			return nil
+	// 		},
+	// 	})
+
+	// use inside tls config from utils/cert.go. not use cert and key files any more
+	ln, err := net.Listen("tcp", "[::]:"+strconv.Itoa(int(p.Myconfig.Port)))
+	if err != nil {
+		log.Fatalf("net listen port %d error: %s", p.Myconfig.Port, err.Error())
+		return err
+	}
+	ln = tls.NewListener(ln, utils.TLSConfig())
+
+	// 正常时阻塞在这里
+	err = app.Listener(ln,
 		fiber.ListenConfig{
-			CertFile:              "etc/cert.pem",
-			CertKeyFile:           "etc/key.pem",
 			DisableStartupMessage: false,
 			EnablePrintRoutes:     false,
 			ListenerNetwork:       "tcp", // listen ipv4 and ipv6

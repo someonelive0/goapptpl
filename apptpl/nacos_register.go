@@ -52,6 +52,7 @@ func (p *NacosRegister) Regist() error {
 			continue
 		}
 		log.Infof("nacos login resp: %v", resp)
+		resp.Close()
 
 		// then regist service
 		url = fmt.Sprintf("%s/nacos/v2/ns/instance?serviceName=goapptpl&ip=%s&port=%d",
@@ -67,6 +68,7 @@ func (p *NacosRegister) Regist() error {
 				continue
 			}
 			log.Tracef("nacos register resp: %v", resp)
+			resp.Close()
 
 			time.Sleep(NACOS_LOOP_INTERVAL * time.Second)
 		}
@@ -92,6 +94,7 @@ func (p *NacosRegister) Stop() error {
 		return err
 	}
 	log.Tracef("nacos unregist service resp: %v", resp)
+	resp.Close()
 
 	return nil
 }
@@ -108,6 +111,7 @@ func (p *NacosRegister) GetConfig(dataId, group, namespaceId string) (string, er
 		log.Errorf("nacos GetConfig '%s'.'%s' failed: %v", group, dataId, err)
 		return "", err
 	}
+	defer resp.Close()
 
 	m := make(map[string]interface{})
 	if err = json.Unmarshal(resp.Body(), &m); err != nil {
