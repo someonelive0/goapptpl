@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"net"
 	"strconv"
@@ -92,7 +91,7 @@ func (p *ApiServer) Start() error {
 		log.Fatalf("net listen port %d error: %s", p.Myconfig.Port, err.Error())
 		return err
 	}
-	ln = tls.NewListener(ln, utils.TLSConfig())
+	// ln = tls.NewListener(ln, utils.TLSConfig())
 
 	// 正常时阻塞在这里
 	err = app.Listener(ln,
@@ -193,6 +192,8 @@ func (p *ApiServer) initRoute(app *fiber.App) error {
 		return c.Send(b)
 	})
 
+	app.Post("/ticket/v1/analysis", p.ticketHandler)
+
 	// Or extend your config for customization
 	// Assign the middleware to /metrics
 	// and change the Title to `MyService Metrics Page`
@@ -217,4 +218,38 @@ func (p *ApiServer) authMiddleware(c fiber.Ctx) error {
 	// log.Info(claims)
 
 	return c.Next()
+}
+
+func (p *ApiServer) ticketHandler(c fiber.Ctx) error {
+	log.Debugf("headers: %v", c.GetReqHeaders())
+	log.Debugf("body: %s", c.Body())
+
+	m := make(map[string]string)
+	if err := json.Unmarshal(c.Body(), &m); err != nil {
+		log.Errorf("json.Unmarshal error: %#v", err)
+		return err
+	}
+	log.Debugf("request appCode: %#v", m["appCode"])
+	log.Debugf("request tenant: %#v", m["tenant"])
+	log.Debugf("request ticket/data: %#v", m["data"])
+
+	resp := `{
+		"retCode": "1000",
+		"msg": "",
+		"token": "",
+		"userInfo": {
+			"accountID": "yewu-test",
+			"name": "",
+			"empNo": "",
+			"idCardNum": "",
+			"phone": "",
+			"mobile": "",
+			"email": "",
+			"tenant": ""
+		}
+	}`
+	c.Context().SetContentType("application/json")
+	c.WriteString(resp)
+
+	return nil
 }
