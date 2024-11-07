@@ -99,6 +99,8 @@ func (p *ClickhouseHandler) tablesHandler(c fiber.Ctx) error {
 			return err
 		}
 		_, err = io.Copy(c, fp)
+		fp.Close()
+		os.Remove("log/" + filename)
 		return err
 
 	default:
@@ -152,6 +154,8 @@ func (p *ClickhouseHandler) columnsHandler(c fiber.Ctx) error {
 			return err
 		}
 		_, err = io.Copy(c, fp)
+		fp.Close()
+		os.Remove("log/" + filename)
 		return err
 
 	default:
@@ -215,6 +219,8 @@ func (p *ClickhouseHandler) tableHandler(c fiber.Ctx) error {
 			return err
 		}
 		_, err = io.Copy(c, fp)
+		fp.Close()
+		os.Remove("log/" + filename)
 		return err
 
 	default:

@@ -90,6 +90,8 @@ func (p *MysqlHandler) tablesHandler(c fiber.Ctx) error {
 			return err
 		}
 		_, err = io.Copy(c, fp)
+		fp.Close()
+		os.Remove("log/" + filename)
 		return err
 
 	case "docx":
@@ -109,6 +111,8 @@ func (p *MysqlHandler) tablesHandler(c fiber.Ctx) error {
 			return err
 		}
 		_, err = io.Copy(c, fp)
+		fp.Close()
+		os.Remove("log/" + filename)
 		return err
 
 	default:
@@ -161,6 +165,8 @@ func (p *MysqlHandler) columnsHandler(c fiber.Ctx) error {
 			return err
 		}
 		_, err = io.Copy(c, fp)
+		fp.Close()
+		os.Remove("log/" + filename)
 		return err
 
 	default:
@@ -232,6 +238,8 @@ func (p *MysqlHandler) indexesHandler(c fiber.Ctx) error {
 			return err
 		}
 		_, err = io.Copy(c, fp)
+		fp.Close()
+		os.Remove("log/" + filename)
 		return err
 
 	default:
@@ -293,6 +301,8 @@ func (p *MysqlHandler) tableHandler(c fiber.Ctx) error {
 			return err
 		}
 		_, err = io.Copy(c, fp)
+		fp.Close()
+		os.Remove("log/" + filename)
 		return err
 
 	default:
