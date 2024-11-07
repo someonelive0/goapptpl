@@ -116,8 +116,8 @@ func (p *ApiServer) Start() error {
 
 func (p *ApiServer) Stop() error {
 	if p.app != nil {
-		err := p.app.ShutdownWithTimeout(2 * time.Second)
-		// err := p.app.Shutdown()
+		// err := p.app.ShutdownWithTimeout(2 * time.Second)
+		err := p.app.Shutdown()
 		p.app = nil
 		p.mysqlHdl.Close()
 		p.mysqlHdl = nil
