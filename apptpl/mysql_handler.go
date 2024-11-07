@@ -92,6 +92,25 @@ func (p *MysqlHandler) tablesHandler(c fiber.Ctx) error {
 		_, err = io.Copy(c, fp)
 		return err
 
+	case "docx":
+		filename := p.cfg.DBName + "-tables.docx"
+		title := "数据库 Mysql - " + p.cfg.DBName + " tables"
+
+		ch := make(chan string, 100)
+		go p.sql2chan(ch, sqltext)
+
+		if err := utils.Json2docx(ch, title, "log/"+filename); err != nil {
+			return err
+		}
+
+		c.Attachment(filename)
+		fp, err := os.Open("log/" + filename)
+		if err != nil {
+			return err
+		}
+		_, err = io.Copy(c, fp)
+		return err
+
 	default:
 		c.Status(400)
 		c.SendString(fmt.Sprintf("mime '%s' not supported", mime))

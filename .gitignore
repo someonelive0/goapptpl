@@ -2,7 +2,7 @@
 /tmp
 /etc/*.toml
 *.log.*
-log/*.xlsx
+log
 *.exe
 goapptpl
 .vscode
