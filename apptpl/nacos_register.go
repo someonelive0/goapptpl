@@ -92,7 +92,12 @@ func (p *NacosRegister) Regist() error {
 
 func (p *NacosRegister) Stop() error {
 	p.shutdown = true
-	close(p.chtimeout)
+	if p.chtimeout != nil {
+		close(p.chtimeout)
+	}
+	if !p.Nacosconfig.Enable {
+		return nil
+	}
 
 	// then delete nacos service
 	url := fmt.Sprintf("%s/nacos/v2/ns/instance?serviceName=goapptpl&ip=%s&port=%d",
