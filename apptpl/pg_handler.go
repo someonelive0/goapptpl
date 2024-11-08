@@ -91,6 +91,8 @@ order by tab.schemaname, tab.tablename`
 			return err
 		}
 		_, err = io.Copy(c, fp)
+		fp.Close()
+		os.Remove("log/" + filename)
 		return err
 
 	default:
@@ -142,6 +144,8 @@ func (p *PgHandler) columnsHandler(c fiber.Ctx) error {
 			return err
 		}
 		_, err = io.Copy(c, fp)
+		fp.Close()
+		os.Remove("log/" + filename)
 		return err
 
 	default:
@@ -201,6 +205,8 @@ where
 			return err
 		}
 		_, err = io.Copy(c, fp)
+		fp.Close()
+		os.Remove("log/" + filename)
 		return err
 
 	default:
@@ -244,6 +250,8 @@ func (p *PgHandler) tableHandler(c fiber.Ctx) error {
 			return err
 		}
 		_, err = io.Copy(c, fp)
+		fp.Close()
+		os.Remove("log/" + filename)
 		return err
 
 	default:

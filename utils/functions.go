@@ -164,6 +164,7 @@ func GetOutBoundIP4() (string, error) {
 	if err != nil {
 		return "", err
 	}
+	defer conn.Close()
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
 	ip := strings.Split(localAddr.String(), ":")[0]
 	return ip, nil

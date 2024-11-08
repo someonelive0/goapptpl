@@ -90,6 +90,29 @@ func (p *MysqlHandler) tablesHandler(c fiber.Ctx) error {
 			return err
 		}
 		_, err = io.Copy(c, fp)
+		fp.Close()
+		os.Remove("log/" + filename)
+		return err
+
+	case "docx":
+		filename := p.cfg.DBName + "-tables.docx"
+		title := "数据库 Mysql - " + p.cfg.DBName + " tables"
+
+		ch := make(chan string, 100)
+		go p.sql2chan(ch, sqltext)
+
+		if err := utils.Json2docx(ch, title, "log/"+filename); err != nil {
+			return err
+		}
+
+		c.Attachment(filename)
+		fp, err := os.Open("log/" + filename)
+		if err != nil {
+			return err
+		}
+		_, err = io.Copy(c, fp)
+		fp.Close()
+		os.Remove("log/" + filename)
 		return err
 
 	default:
@@ -142,6 +165,8 @@ func (p *MysqlHandler) columnsHandler(c fiber.Ctx) error {
 			return err
 		}
 		_, err = io.Copy(c, fp)
+		fp.Close()
+		os.Remove("log/" + filename)
 		return err
 
 	default:
@@ -213,6 +238,8 @@ func (p *MysqlHandler) indexesHandler(c fiber.Ctx) error {
 			return err
 		}
 		_, err = io.Copy(c, fp)
+		fp.Close()
+		os.Remove("log/" + filename)
 		return err
 
 	default:
@@ -274,6 +301,8 @@ func (p *MysqlHandler) tableHandler(c fiber.Ctx) error {
 			return err
 		}
 		_, err = io.Copy(c, fp)
+		fp.Close()
+		os.Remove("log/" + filename)
 		return err
 
 	default:
