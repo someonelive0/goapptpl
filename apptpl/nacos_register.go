@@ -21,6 +21,7 @@ type NacosRegister struct {
 	Myconfig    *MyConfig
 	localip     string
 	shutdown    bool
+	chtimeout   chan bool
 }
 
 // loop to regist service
@@ -29,6 +30,7 @@ func (p *NacosRegister) Regist() error {
 		log.Infof("nacos register disabled by config, so not regist to nacos")
 		return nil
 	}
+	p.chtimeout = make(chan bool, 1)
 
 	cc := client.New()
 	cc.SetTimeout(time.Duration(p.Nacosconfig.Timeout) * time.Second)
@@ -48,7 +50,13 @@ func (p *NacosRegister) Regist() error {
 		resp, err := cc.Post(url)
 		if err != nil {
 			log.Errorf("nacos login failed: %v", err)
-			time.Sleep(NACOS_LOOP_INTERVAL * time.Second)
+
+			go func() {
+				time.Sleep(NACOS_LOOP_INTERVAL * time.Second)
+				p.chtimeout <- true
+			}()
+			<-p.chtimeout
+
 			continue
 		}
 		log.Infof("nacos login resp: %v", resp)
@@ -70,7 +78,12 @@ func (p *NacosRegister) Regist() error {
 			log.Tracef("nacos register resp: %v", resp)
 			resp.Close()
 
-			time.Sleep(NACOS_LOOP_INTERVAL * time.Second)
+			go func() {
+				// time.Sleep(NACOS_LOOP_INTERVAL * time.Second)
+				time.Sleep(time.Duration(p.Nacosconfig.Timeout) * time.Second)
+				p.chtimeout <- true
+			}()
+			<-p.chtimeout
 		}
 	}
 
@@ -80,6 +93,7 @@ func (p *NacosRegister) Regist() error {
 
 func (p *NacosRegister) Stop() error {
 	p.shutdown = true
+	close(p.chtimeout)
 
 	// then delete nacos service
 	url := fmt.Sprintf("%s/nacos/v2/ns/instance?serviceName=goapptpl&ip=%s&port=%d",
