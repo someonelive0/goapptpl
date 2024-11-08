@@ -52,7 +52,7 @@ func (p *NacosRegister) Regist() error {
 			log.Errorf("nacos login failed: %v", err)
 
 			go func() {
-				time.Sleep(NACOS_LOOP_INTERVAL * time.Second)
+				time.Sleep(time.Duration(p.Nacosconfig.Timeout) * time.Second)
 				p.chtimeout <- true
 			}()
 			<-p.chtimeout
@@ -79,8 +79,7 @@ func (p *NacosRegister) Regist() error {
 			resp.Close()
 
 			go func() {
-				// time.Sleep(NACOS_LOOP_INTERVAL * time.Second)
-				time.Sleep(time.Duration(p.Nacosconfig.Timeout) * time.Second)
+				time.Sleep(NACOS_LOOP_INTERVAL * time.Second)
 				p.chtimeout <- true
 			}()
 			<-p.chtimeout
