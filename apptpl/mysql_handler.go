@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/gofiber/fiber/v3"
+	"github.com/patrickmn/go-cache"
 	log "github.com/sirupsen/logrus"
 
 	"goapptol/utils"
@@ -23,6 +24,7 @@ const (
 
 type MysqlHandler struct {
 	Dbconfig *DBConfig
+	Mycache  *cache.Cache
 	db       *sql.DB       // mysql dbpool
 	cfg      *mysql.Config // mysql config of dsn
 }
@@ -72,7 +74,31 @@ func (p *MysqlHandler) tablesHandler(c fiber.Ctx) error {
 	mime := c.Query("mime", "json") // if Queries params mime is not set, default to json
 	switch mime {
 	case "json":
-		return p.sqlHandler(c, sqltext)
+		// return p.sqlHandler(c, sqltext)
+		// use local cache to reduce mysql load
+		if b, found := p.Mycache.Get("mysql:tables"); found {
+			c.Context().SetContentType("application/json")
+			c.Write(b.([]byte))
+			return nil
+		}
+
+		ch := make(chan string, 100)
+		go p.sql2chan(ch, sqltext)
+
+		c.Context().SetContentType("application/json")
+		c.WriteString("[")
+		i := 0
+		for jsonstr := range ch {
+			if i > 0 {
+				c.WriteString(",")
+			}
+			c.WriteString(jsonstr)
+			i++
+		}
+		c.WriteString("]")
+
+		p.Mycache.Set("mysql:tables", c.Response().Body(), 5*time.Second)
+		return nil
 
 	case "excel":
 		filename := p.cfg.DBName + "-tables.xlsx"

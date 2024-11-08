@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/patrickmn/go-cache"
 	log "github.com/sirupsen/logrus"
 
 	"goapptol/utils"
@@ -20,9 +21,13 @@ type ApiServer struct {
 	redisHdl *RedisHandler
 	ckHdl    *ClickhouseHandler
 	pgHdl    *PgHandler
+
+	mycache *cache.Cache
 }
 
 func (p *ApiServer) Start() error {
+	p.mycache = cache.New(5*time.Minute, 10*time.Minute)
+
 	log.Info("🚀 API server prepare...")
 	app := fiber.New(fiber.Config{
 		CaseSensitive: true,
@@ -39,7 +44,7 @@ func (p *ApiServer) Start() error {
 	p.initRoute(app)
 
 	// add MysqlHandler
-	mysqlHdl := MysqlHandler{Dbconfig: &p.Myconfig.MysqlConfig}
+	mysqlHdl := MysqlHandler{Dbconfig: &p.Myconfig.MysqlConfig, Mycache: p.mycache}
 	mysqlHdl.AddRouter(app.Group("/mysql"))
 
 	// add MinioHandler
