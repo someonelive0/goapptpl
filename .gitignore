@@ -6,3 +6,4 @@ log
 *.exe
 goapptpl
 .vscode
+testing/*.docx
