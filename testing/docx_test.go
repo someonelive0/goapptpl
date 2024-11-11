@@ -3,11 +3,12 @@ package main
 import (
 	"fmt"
 	"log"
+	"testing"
 
 	"github.com/gomutex/godocx"
 )
 
-func main() {
+func TestDocx(t *testing.T) {
 	// Create a new DOCX document
 	document, err := godocx.NewDocument()
 	if err != nil {
@@ -76,7 +77,7 @@ func main() {
 	}
 
 	// Save the modified document to a new file
-	err = document.SaveTo("log/demo.docx")
+	err = document.SaveTo("demo.docx")
 	if err != nil {
 		log.Fatal(err)
 	}
