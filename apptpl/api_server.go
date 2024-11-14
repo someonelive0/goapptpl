@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net"
 	"strconv"
 	"time"
@@ -198,6 +199,8 @@ func (p *ApiServer) initRoute(app *fiber.App) error {
 	})
 
 	app.Post("/ticket/v1/analysis", p.ticketHandler)
+	app.Post("/datasecurity/analyzerisk/v2/batch", p.aiAnalyzeriskHandler)
+	app.Post("/datasecurity/crucialdataonfly/identify/v1/batch", p.aiDataidentifyHandler)
 
 	// Or extend your config for customization
 	// Assign the middleware to /metrics
@@ -253,6 +256,111 @@ func (p *ApiServer) ticketHandler(c fiber.Ctx) error {
 			"tenant": ""
 		}
 	}`
+	c.Context().SetContentType("application/json")
+	c.WriteString(resp)
+
+	return nil
+}
+
+func (p *ApiServer) aiAnalyzeriskHandler(c fiber.Ctx) error {
+	// log.Debugf("headers: %v", c.GetReqHeaders())
+	log.Debugf("body: %s", c.Body())
+
+	m := make(map[string]interface{})
+	if err := json.Unmarshal(c.Body(), &m); err != nil {
+		log.Errorf("json.Unmarshal error: %#v", err)
+		return err
+	}
+	if _, ok := m["inputs"]; !ok {
+		return fiber.NewError(400, "inputs is required")
+	}
+	// log.Debugf("request inputs: %#v", m["inputs"])
+	// log.Debugf("request tenant: %#v", m["tenant"])
+	// log.Debugf("request ticket/data: %#v", m["data"])
+
+	resp := `{
+		"detail": "ok",
+		"output": [`
+	inputs := m["inputs"].([]interface{})
+	for i, input := range inputs {
+		log.Debugf("request input: %#v", input)
+		if i > 0 {
+			resp += ", "
+		}
+
+		requestId := ""
+		if _, ok := input.(map[string]interface{})["requestId"]; ok {
+			requestId = input.(map[string]interface{})["requestId"].(string)
+		}
+
+		resp += fmt.Sprintf(`{
+			"isAgree":  1,
+			"reason": "ok",
+			"requestId": "%s"
+		}`, requestId)
+	}
+
+	resp += `
+	] }`
+
+	log.Debugf("response: |%s|", resp)
+	if err := json.Unmarshal([]byte(resp), &m); err != nil {
+		log.Errorf("json.Unmarshal resp error: %#v", err)
+		return err
+	}
+
+	c.Context().SetContentType("application/json")
+	c.WriteString(resp)
+
+	return nil
+}
+
+func (p *ApiServer) aiDataidentifyHandler(c fiber.Ctx) error {
+	// log.Debugf("headers: %v", c.GetReqHeaders())
+	log.Debugf("body: %s", c.Body())
+
+	m := make(map[string]interface{})
+	if err := json.Unmarshal(c.Body(), &m); err != nil {
+		log.Errorf("json.Unmarshal error: %#v", err)
+		return err
+	}
+	if _, ok := m["inputs"]; !ok {
+		return fiber.NewError(400, "inputs is required")
+	}
+	// log.Debugf("request inputs: %#v", m["inputs"])
+	// log.Debugf("request tenant: %#v", m["tenant"])
+	// log.Debugf("request ticket/data: %#v", m["data"])
+
+	resp := `{
+		"detail": "ok",
+		"output": [`
+	inputs := m["inputs"].([]interface{})
+	for i, input := range inputs {
+		log.Debugf("request input: %#v", input)
+		if i > 0 {
+			resp += ", "
+		}
+		apiPattern := ""
+		if _, ok := input.(map[string]interface{})["apiPattern"]; ok {
+			apiPattern = input.(map[string]interface{})["apiPattern"].(string)
+		}
+
+		resp += fmt.Sprintf(`{
+			"isCrucial":  1,
+			"classNames": ["A-1", "A-2", "A-3"],
+			"apiPattern": "%s"
+		}`, apiPattern)
+	}
+
+	resp += `
+	] }`
+
+	log.Debugf("response: |%s|", resp)
+	if err := json.Unmarshal([]byte(resp), &m); err != nil {
+		log.Errorf("json.Unmarshal resp error: %#v", err)
+		return err
+	}
+
 	c.Context().SetContentType("application/json")
 	c.WriteString(resp)
 
