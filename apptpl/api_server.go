@@ -263,6 +263,10 @@ func (p *ApiServer) ticketHandler(c fiber.Ctx) error {
 }
 
 func (p *ApiServer) aiAnalyzeriskHandler(c fiber.Ctx) error {
+
+	// test failed response
+	// return fiber.NewError(400, `{ "detail": "AI模型分析失败" }`)
+
 	// log.Debugf("headers: %v", c.GetReqHeaders())
 	log.Debugf("body: %s", c.Body())
 
@@ -279,7 +283,7 @@ func (p *ApiServer) aiAnalyzeriskHandler(c fiber.Ctx) error {
 	// log.Debugf("request ticket/data: %#v", m["data"])
 
 	resp := `{
-		"detail": "ok",
+		"detail": "success",
 		"output": [`
 	inputs := m["inputs"].([]interface{})
 	for i, input := range inputs {
@@ -295,7 +299,7 @@ func (p *ApiServer) aiAnalyzeriskHandler(c fiber.Ctx) error {
 
 		resp += fmt.Sprintf(`{
 			"isAgree":  1,
-			"reason": "ok",
+			"reason": "符合风险AI模型",
 			"requestId": "%s"
 		}`, requestId)
 	}
@@ -316,6 +320,10 @@ func (p *ApiServer) aiAnalyzeriskHandler(c fiber.Ctx) error {
 }
 
 func (p *ApiServer) aiDataidentifyHandler(c fiber.Ctx) error {
+
+	// test failed response
+	// return fiber.NewError(400, `{ "detail": "AI模型分析重要数据失败" }`)
+
 	// log.Debugf("headers: %v", c.GetReqHeaders())
 	log.Debugf("body: %s", c.Body())
 
