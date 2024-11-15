@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/tls"
 	"encoding/json"
+	"fmt"
 	"net"
 	"strconv"
 	"time"
@@ -189,6 +190,11 @@ func (p *ApiServer) initRoute(app *fiber.App) error {
 	// app.GET("/cache", handler.handleCache)
 	app.Get("/", func(c fiber.Ctx) error {
 		return fiber.NewError(500, "Custom error message")
+	})
+	app.Get("/status", func(c fiber.Ctx) error {
+		s := fmt.Sprintf(`{ "status": "%s", "runtime": "%s" }`,
+			"running", START_TIME.Format(time.RFC3339)) // "2006-01-02 15:04:05"
+		return c.SendString(s)
 	})
 	app.Get("/version", func(c fiber.Ctx) error {
 		return c.SendString(utils.Version("goapptpl")) // => ✋ versoin
