@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -97,7 +98,7 @@ func (p *ApiServer) Start() error {
 		log.Fatalf("net listen port %d error: %s", p.Myconfig.Port, err.Error())
 		return err
 	}
-	// ln = tls.NewListener(ln, utils.TLSConfig())
+	ln = tls.NewListener(ln, utils.TLSConfig())
 
 	// 正常时阻塞在这里
 	err = app.Listener(ln,
