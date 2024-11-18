@@ -16,6 +16,8 @@ type HardwareHandler struct {
 func (p *HardwareHandler) AddRouter(r fiber.Router) error {
 	log.Info("MysqlHandler AddRouter")
 
+	r.Get("", p.hdHandler)
+	r.Get("/", p.hdHandler)
 	r.Get("/cpu", p.cpuHandler)
 	r.Get("/mem", p.memHandler)
 	r.Get("/block", p.blockHandler)
@@ -27,6 +29,24 @@ func (p *HardwareHandler) AddRouter(r fiber.Router) error {
 	r.Get("/baseboard", p.baseboardHandler)
 	r.Get("/product", p.productHandler)
 
+	return nil
+}
+
+// GET /hardware/cpu
+func (p *HardwareHandler) hdHandler(c fiber.Ctx) error {
+	c.Context().SetContentType("text/html")
+	c.WriteString(`<html><body><h1>Hardware</h1>
+	<a href="/hardware/cpu">cpu</a><br>
+	<a href="/hardware/mem">mem</a><br>
+	<a href="/hardware/block">block</a><br>
+	<a href="/hardware/network">network</a><br>
+	<a href="/hardware/pci">pci</a><br>
+	<a href="/hardware/gpu">gpu</a><br>
+	<a href="/hardware/chassis">chassis</a><br>
+	<a href="/hardware/bios">bios</a><br>
+	<a href="/hardware/baseboard">baseboard</a><br>
+	<a href="/hardware/product">product</a><br>
+	</body></html>`)
 	return nil
 }
 
