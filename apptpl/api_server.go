@@ -16,13 +16,14 @@ import (
 )
 
 type ApiServer struct {
-	Myconfig *MyConfig
-	app      *fiber.App
-	mysqlHdl *MysqlHandler
-	minioHdl *MinioHandler
-	redisHdl *RedisHandler
-	ckHdl    *ClickhouseHandler
-	pgHdl    *PgHandler
+	Myconfig    *MyConfig
+	app         *fiber.App
+	mysqlHdl    *MysqlHandler
+	minioHdl    *MinioHandler
+	redisHdl    *RedisHandler
+	ckHdl       *ClickhouseHandler
+	pgHdl       *PgHandler
+	hardwareHdl *HardwareHandler
 
 	mycache *cache.Cache
 }
@@ -65,6 +66,10 @@ func (p *ApiServer) Start() error {
 	pgHdl := PgHandler{Dbconfig: &p.Myconfig.PgConfig}
 	pgHdl.AddRouter(app.Group("/postgresql"))
 
+	// add HardwareHandler
+	hardwareHdl := HardwareHandler{Mycache: p.mycache}
+	hardwareHdl.AddRouter(app.Group("/hardware"))
+
 	// data, _ := json.MarshalIndent(app.Stack(), "", "  ")
 	// log.Debug(string(data))
 	// data, _ = json.MarshalIndent(app.Config(), "", "  ")
@@ -76,6 +81,7 @@ func (p *ApiServer) Start() error {
 	p.redisHdl = &redisHdl
 	p.ckHdl = &ckHdl
 	p.pgHdl = &pgHdl
+	p.hardwareHdl = &hardwareHdl
 
 	// use CertFile and CertKeyFile to listen https
 	// 正常时阻塞在这里
