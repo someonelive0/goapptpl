@@ -3,15 +3,18 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/jaypipes/ghw"
+	"github.com/patrickmn/go-cache"
 	log "github.com/sirupsen/logrus"
 
 	"goapptol/utils"
 )
 
 type HardwareHandler struct {
+	Mycache *cache.Cache
 }
 
 // r := app.Group("/hardware")
@@ -54,6 +57,12 @@ func (p *HardwareHandler) hdHandler(c fiber.Ctx) error {
 
 // GET /hardware/cpu
 func (p *HardwareHandler) cpuHandler(c fiber.Ctx) error {
+	if b, found := p.Mycache.Get(c.Path()); found {
+		c.Context().SetContentType("application/json")
+		c.Write(b.([]byte))
+		return nil
+	}
+
 	cpu, err := ghw.CPU()
 	if err != nil {
 		log.Errorf("Error getting CPU info: %v", err)
@@ -89,6 +98,8 @@ func (p *HardwareHandler) cpuHandler(c fiber.Ctx) error {
 	// 		}
 	// 	}
 	// }
+
+	p.Mycache.Set(c.Path(), b, 60*time.Second)
 
 	return nil
 }

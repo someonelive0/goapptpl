@@ -67,7 +67,7 @@ func (p *ApiServer) Start() error {
 	pgHdl.AddRouter(app.Group("/postgresql"))
 
 	// add HardwareHandler
-	hardwareHdl := HardwareHandler{}
+	hardwareHdl := HardwareHandler{Mycache: p.mycache}
 	hardwareHdl.AddRouter(app.Group("/hardware"))
 
 	// data, _ := json.MarshalIndent(app.Stack(), "", "  ")
