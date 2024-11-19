@@ -7,6 +7,8 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/jaypipes/ghw"
 	log "github.com/sirupsen/logrus"
+
+	"goapptol/utils"
 )
 
 type HardwareHandler struct {
@@ -55,7 +57,7 @@ func (p *HardwareHandler) cpuHandler(c fiber.Ctx) error {
 	cpu, err := ghw.CPU()
 	if err != nil {
 		log.Errorf("Error getting CPU info: %v", err)
-		return err
+		return utils.MkError(500, fmt.Sprintf("Error getting CPU info: %v", err))
 	}
 	// c.WriteString(fmt.Sprintf("cpu %#v\n", cpu))
 
@@ -96,7 +98,7 @@ func (p *HardwareHandler) memHandler(c fiber.Ctx) error {
 	memory, err := ghw.Memory()
 	if err != nil {
 		log.Errorf("Error getting memory info: %v", err)
-		return err
+		return utils.MkError(500, fmt.Sprintf("Error getting memory info: %v", err))
 	}
 
 	c.WriteString(fmt.Sprintf(`{ "memo": "%s", `, memory.String()))
@@ -113,7 +115,7 @@ func (p *HardwareHandler) blockHandler(c fiber.Ctx) error {
 	block, err := ghw.Block()
 	if err != nil {
 		log.Errorf("Error getting block storage info: %v", err)
-		return err
+		return utils.MkError(500, fmt.Sprintf("Error getting storage info: %v", err))
 	}
 
 	c.Context().SetContentType("application/json")
@@ -135,11 +137,11 @@ func (p *HardwareHandler) networkHandler(c fiber.Ctx) error {
 	net, err := ghw.Network()
 	if err != nil {
 		log.Errorf("Error getting network info: %v", err)
-		return err
+		return utils.MkError(500, fmt.Sprintf("Error getting network info: %v", err))
 	}
 
 	c.Context().SetContentType("application/json")
-	b, _ := json.Marshal(net)
+	b, _ := json.Marshal(net.NICs)
 	c.Write(b)
 
 	// for _, nic := range net.NICs {
@@ -167,13 +169,11 @@ func (p *HardwareHandler) pciHandler(c fiber.Ctx) error {
 	pci, err := ghw.PCI()
 	if err != nil {
 		log.Errorf("Error getting PCI info: %v", err)
-		return err
+		return utils.MkError(500, fmt.Sprintf("Error getting PCI info: %v", err))
 	}
-	fmt.Printf("host PCI devices:\n")
-	fmt.Println("====================================================")
 
 	c.Context().SetContentType("application/json")
-	b, _ := json.Marshal(pci)
+	b, _ := json.Marshal(pci.Devices)
 	c.Write(b)
 
 	// for _, device := range pci.Devices {
@@ -198,11 +198,11 @@ func (p *HardwareHandler) gpuHandler(c fiber.Ctx) error {
 	gpu, err := ghw.GPU()
 	if err != nil {
 		log.Errorf("Error getting GPU info: %v", err)
-		return err
+		return utils.MkError(500, fmt.Sprintf("Error getting GPU info: %v", err))
 	}
 
 	c.Context().SetContentType("application/json")
-	b, _ := json.Marshal(gpu)
+	b, _ := json.Marshal(gpu.GraphicsCards)
 	c.Write(b)
 
 	// for _, card := range gpu.GraphicsCards {
@@ -217,7 +217,7 @@ func (p *HardwareHandler) chassisHandler(c fiber.Ctx) error {
 	chassis, err := ghw.Chassis()
 	if err != nil {
 		log.Errorf("Error getting chassis info: %v", err)
-		return err
+		return utils.MkError(500, fmt.Sprintf("Error getting chassis info: %v", err))
 	}
 
 	c.Context().SetContentType("application/json")
@@ -231,7 +231,8 @@ func (p *HardwareHandler) chassisHandler(c fiber.Ctx) error {
 func (p *HardwareHandler) biosHandler(c fiber.Ctx) error {
 	bios, err := ghw.BIOS()
 	if err != nil {
-		fmt.Printf("Error getting BIOS info: %v", err)
+		log.Errorf("Error getting BIOS info: %v", err)
+		return utils.MkError(500, fmt.Sprintf("Error getting BIOS info: %v", err))
 	}
 
 	c.Context().SetContentType("application/json")
@@ -245,7 +246,8 @@ func (p *HardwareHandler) biosHandler(c fiber.Ctx) error {
 func (p *HardwareHandler) baseboardHandler(c fiber.Ctx) error {
 	baseboard, err := ghw.Baseboard()
 	if err != nil {
-		fmt.Printf("Error getting baseboard info: %v", err)
+		log.Errorf("Error getting baseboard info: %v", err)
+		return utils.MkError(500, fmt.Sprintf("Error getting baseboard info: %v", err))
 	}
 
 	c.Context().SetContentType("application/json")
@@ -259,7 +261,8 @@ func (p *HardwareHandler) baseboardHandler(c fiber.Ctx) error {
 func (p *HardwareHandler) productHandler(c fiber.Ctx) error {
 	product, err := ghw.Product()
 	if err != nil {
-		fmt.Printf("Error getting product info: %v", err)
+		log.Errorf("Error getting product info: %v", err)
+		return utils.MkError(500, fmt.Sprintf("Error getting product info: %v", err))
 	}
 
 	c.Context().SetContentType("application/json")
