@@ -3,8 +3,11 @@
 
 version = "1.0"
 
-host = "0.0.0.0"
+# server config, default enbale ipv4 and ipv6
+host = "::"
 port = 3000
+# ssl_enable means enable https, default is true. if you want to disable https, set it to false
+ssl_enable = true
 
 
 [mysql]

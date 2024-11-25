@@ -56,9 +56,10 @@ type MyConfig struct {
 	Filename string    `toml:"filename" json:"filename" xml:"filename,attr"`
 	LoadTime time.Time `toml:"load_time" json:"load_time" xml:"load_time,attr"`
 
-	Version string `toml:"version" json:"version"`
-	Host    string `toml:"host" json:"host"`
-	Port    uint   `toml:"port" json:"port"`
+	Version   string `toml:"version" json:"version"`
+	Host      string `toml:"host" json:"host"`
+	Port      uint   `toml:"port" json:"port"`
+	SslEnable bool   `toml:"ssl_enable" json:"ssl_enable"`
 
 	MysqlConfig DBConfig    `toml:"mysql" json:"mysql"`
 	MinioConfig MinioConfig `toml:"minio" json:"minio"`
