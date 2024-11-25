@@ -104,7 +104,9 @@ func (p *ApiServer) Start() error {
 		log.Fatalf("net listen port %d error: %s", p.Myconfig.Port, err.Error())
 		return err
 	}
-	ln = tls.NewListener(ln, utils.TLSConfig())
+	if p.Myconfig.SslEnable {
+		ln = tls.NewListener(ln, utils.TLSConfig())
+	}
 
 	// 正常时阻塞在这里
 	err = app.Listener(ln,
