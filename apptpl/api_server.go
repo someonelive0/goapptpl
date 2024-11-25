@@ -369,7 +369,7 @@ func (p *ApiServer) aiDataidentifyHandler(c fiber.Ctx) error {
 
 		resp += fmt.Sprintf(`{
 			"isCrucial":  1,
-			"classNames": ["A-1", "A-2", "A-3"],
+			"categories": ["身份鉴别信息", "A-2", "重要信息"],
 			"apiPattern": "%s"
 		}`, apiPattern)
 	}
