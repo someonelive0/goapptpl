@@ -1,9 +1,10 @@
 /go.sum
 /tmp
 /etc/*.toml
+/vendor
+/log
+/.vscode
 *.log.*
-log
 *.exe
 goapptpl
-.vscode
 testing/*.docx
