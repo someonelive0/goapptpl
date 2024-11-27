@@ -217,12 +217,15 @@ func (p *ApiServer) initRoute(app *fiber.App) error {
 
 	// restart myself
 	app.Get("/meta/restart", func(c fiber.Ctx) error {
-		c.SendString("restarting...")
-		err := utils.RestartProcess()
-		if err != nil {
-			return err
-		}
-		return c.SendString("restart success")
+		log.Warnf("RestartProcess... waiting 3 seconds")
+		go func() {
+			time.Sleep(3 * time.Second)
+			err := utils.RestartProcess()
+			if err != nil {
+				log.Errorf("RestartProcess error: %v", err)
+			}
+		}()
+		return c.SendString("process restarting... waiting 3 seconds, now is " + time.Now().Format(time.RFC3339))
 	})
 
 	// 增加运行时信息
