@@ -215,6 +215,16 @@ func (p *ApiServer) initRoute(app *fiber.App) error {
 		return c.Send(b)
 	})
 
+	// restart myself
+	app.Get("/meta/restart", func(c fiber.Ctx) error {
+		c.SendString("restarting...")
+		err := utils.RestartProcess()
+		if err != nil {
+			return err
+		}
+		return c.SendString("restart success")
+	})
+
 	// 增加运行时信息
 	healthzHandler, err := gosh.NewStatisticsHandler(func(w io.Writer) gosh.JSONEncoder {
 		return json.NewEncoder(w)
