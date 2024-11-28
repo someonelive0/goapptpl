@@ -2,8 +2,6 @@ package utils
 
 import (
 	"bytes"
-	"crypto/md5"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -226,9 +224,29 @@ func ParseAnyDatetime(s string) (time.Time, error) {
 	}
 }
 
-func MD5(v []byte) string {
-	//d := []byte(v)
-	m := md5.New()
-	m.Write(v)
-	return hex.EncodeToString(m.Sum(nil))
+// restart myself process, restart process by excutable file.
+func RestartProcess() error {
+	// Get the path to the currently running executable
+	executablePath, err := os.Executable()
+	if err != nil {
+		fmt.Println("Error:", err)
+		return err
+	}
+
+	// Start a new instance of the application
+	cmd := exec.Command(executablePath, os.Args[1:]...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+
+	err = cmd.Start()
+	if err != nil {
+		fmt.Println("Error starting process:", err)
+		return err
+	}
+
+	// Exit the current instance
+	os.Exit(0)
+
+	return nil
 }

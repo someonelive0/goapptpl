@@ -4,11 +4,14 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"strconv"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/adaptor"
+	"github.com/osamingo/gosh"
 	"github.com/patrickmn/go-cache"
 	log "github.com/sirupsen/logrus"
 
@@ -184,7 +187,7 @@ func (p *ApiServer) initRoute(app *fiber.App) error {
 	// 	return c.Next()
 	// })
 
-	// API routes
+	// API meta routes
 	// app.GET("/", handler.handleReadme)
 	// app.GET("/api", handler.handleApi)
 	// app.GET("/version", handler.handleVersion)
@@ -199,18 +202,41 @@ func (p *ApiServer) initRoute(app *fiber.App) error {
 	app.Get("/", func(c fiber.Ctx) error {
 		return fiber.NewError(500, "Custom error message")
 	})
-	app.Get("/status", func(c fiber.Ctx) error {
+	app.Get("/meta/status", func(c fiber.Ctx) error {
 		s := fmt.Sprintf(`{ "status": "%s", "runtime": "%s" }`,
 			"running", START_TIME.Format(time.RFC3339)) // "2006-01-02 15:04:05"
 		return c.SendString(s)
 	})
-	app.Get("/version", func(c fiber.Ctx) error {
+	app.Get("/meta/version", func(c fiber.Ctx) error {
 		return c.SendString(utils.Version("goapptpl")) // => ✋ versoin
 	})
-	app.Get("/config", func(c fiber.Ctx) error {
+	app.Get("/meta/config", func(c fiber.Ctx) error {
 		b, _ := json.Marshal(p.Myconfig)
 		return c.Send(b)
 	})
+
+	// restart myself
+	app.Get("/meta/restart", func(c fiber.Ctx) error {
+		log.Warnf("RestartProcess... waiting 3 seconds")
+		go func() {
+			time.Sleep(3 * time.Second)
+			err := utils.RestartProcess()
+			if err != nil {
+				log.Errorf("RestartProcess error: %v", err)
+			}
+		}()
+		return c.SendString("process restarting... waiting 3 seconds, now is " + time.Now().Format(time.RFC3339))
+	})
+
+	// 增加运行时信息
+	healthzHandler, err := gosh.NewStatisticsHandler(func(w io.Writer) gosh.JSONEncoder {
+		return json.NewEncoder(w)
+	})
+	if err != nil {
+		log.Warnf("new healthz handler error: %v", err)
+	} else {
+		app.Get("/meta/healthz", adaptor.HTTPHandler(healthzHandler))
+	}
 
 	app.Post("/ticket/v1/analysis", p.ticketHandler)
 	app.Post("/datasecurity/analyzerisk/v2/batch", p.aiAnalyzeriskHandler)
