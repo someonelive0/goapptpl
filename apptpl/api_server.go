@@ -241,6 +241,7 @@ func (p *ApiServer) initRoute(app *fiber.App) error {
 	app.Post("/ticket/v1/analysis", p.ticketHandler)
 	app.Post("/datasecurity/analyzerisk/v2/batch", p.aiAnalyzeriskHandler)
 	app.Post("/datasecurity/crucialdataonfly/identify/v1/batch", p.aiDataidentifyHandler)
+	app.Post("/sit/apiData/sitBussinessSystem/apiData", p.buzHandler)
 
 	// Or extend your config for customization
 	// Assign the middleware to /metrics
@@ -414,3 +415,555 @@ func (p *ApiServer) aiDataidentifyHandler(c fiber.Ctx) error {
 
 	return nil
 }
+
+func (p *ApiServer) buzHandler(c fiber.Ctx) error {
+	log.Debugf("headers: %v", c.GetReqHeaders())
+	log.Debugf("body: %s", c.Body())
+
+	m := make(map[string]int)
+	if err := json.Unmarshal(c.Body(), &m); err != nil {
+		log.Errorf("json.Unmarshal error: %#v", err)
+		return err
+	}
+	log.Debugf("request pageNo: %d", m["pageNo"])
+	log.Debugf("request pageSize: %d", m["pageSize"])
+
+	var pageNo int = 1
+	var pageSize int = 100
+	if i, ok := m["pageNo"]; ok {
+		if i > 0 {
+			pageNo = i
+		}
+	}
+	if i, ok := m["pageSize"]; ok {
+		if i > 0 {
+			pageSize = i
+		}
+	}
+
+	buzs := make([]map[string]interface{}, 0)
+	json.Unmarshal([]byte(zhihui_buz), &buzs)
+	log.Debugf("zhihui_buz number: %d", len(buzs))
+	// for i, buz := range buzs {
+	// 	log.Debugf("zhihui_buz %d : %v", i, buz)
+	// }
+
+	offset0 := (pageNo - 1) * pageSize
+	offset1 := pageNo * pageSize
+	if offset0 > len(buzs) {
+		return fiber.NewError(400, "pageNo is too large")
+	}
+	if offset1 > len(buzs) {
+		offset1 = len(buzs)
+	}
+	log.Debugf("pageNo %d, pageSize %d", pageNo, pageSize)
+	log.Debugf("offset from %d to %d", offset0, offset1)
+
+	c.Context().SetContentType("application/json")
+
+	b, _ := json.Marshal(buzs[offset0:offset1])
+	resp := fmt.Sprintf(`{
+		"message":"操作成功",
+		"result":{
+			"data": %s,
+			"pageNo": %d,
+			"pageSize": %d,
+			"totalCount":%d,
+			"totalPage":%d
+		},
+		"status":200
+	}`, b,
+		pageNo, pageSize, len(buzs), len(buzs)/pageSize+1)
+	c.WriteString(resp)
+
+	return nil
+}
+
+/*
+	From Mysql
+
+select json_arrayagg(json_object(
+
+	'buz_id', id,
+	'id', custom_sys_code,
+	'name', business_name,
+	'orgId', dept_id,
+	'twoOrgName', (select depart_name from sys_department sd where sd.id = dept_id),
+	'threeOrgName', (select depart_name from sys_department sd where sd.id = dept_id),
+	'respUserName', record_manager_name,
+	'rankReportId', record_code,
+	'rankReportName', record_name,
+	'rank', record_level,
+	'sys_admin', sys_admin,
+	'system_label', '一般系统'
+	)) as json
+
+from sys_buz_system
+order by id
+*/
+const zhihui_buz = `
+[
+    {
+        "id": "zhihui_1",
+        "name": "默认系统",
+        "rank": "1",
+        "orgId": 60000,
+        "buz_id": 1,
+        "sys_admin": null,
+        "twoOrgName": "默认部门",
+        "rankReportId": "1",
+        "respUserName": null,
+        "system_label": "一般系统",
+        "threeOrgName": "默认部门",
+        "rankReportName": "定级备案名称1"
+    },
+    {
+        "id": "zhihui_sys_2",
+        "name": "数管815(已删除)qqq",
+        "rank": "-1",
+        "orgId": 60002,
+        "buz_id": 2,
+        "sys_admin": "68BD7B0AF88CC1DFD719D0A9F4E627EA",
+        "twoOrgName": "定开支持部",
+        "rankReportId": "2",
+        "respUserName": "2260DD6528E73D0EFDEEBDC2F20D2E14F67AC2BD695E52F706EE8C5C86588FAE",
+        "system_label": "一般系统",
+        "threeOrgName": "定开支持部",
+        "rankReportName": "定级备案名称2"
+    },
+    {
+        "id": "zhihui_3",
+        "name": "数据成都老平台(已删除)",
+        "rank": "1",
+        "orgId": 60012,
+        "buz_id": 3,
+        "sys_admin": "",
+        "twoOrgName": "测试部门",
+        "rankReportId": "3",
+        "respUserName": null,
+        "system_label": "一般系统",
+        "threeOrgName": "测试部门",
+        "rankReportName": "数管平台开发测试系统"
+    },
+    {
+        "id": "zhihui_4",
+        "name": "视频准入系统",
+        "rank": "1",
+        "orgId": 60003,
+        "buz_id": 4,
+        "sys_admin": "E19A7D178827B56324AE6D0FD448D73E",
+        "twoOrgName": "研发中心",
+        "rankReportId": "4",
+        "respUserName": null,
+        "system_label": "一般系统",
+        "threeOrgName": "研发中心",
+        "rankReportName": "定级备案名称3"
+    },
+    {
+        "id": "zhihui_5",
+        "name": "审计系统",
+        "rank": "2",
+        "orgId": 60012,
+        "buz_id": 5,
+        "sys_admin": null,
+        "twoOrgName": "测试部门",
+        "rankReportId": "5",
+        "respUserName": null,
+        "system_label": "一般系统",
+        "threeOrgName": "测试部门",
+        "rankReportName": "定级备案名称5"
+    },
+    {
+        "id": "zhihui_6",
+        "name": "磐维数据库系统(已删除)",
+        "rank": "3",
+        "orgId": 60002,
+        "buz_id": 6,
+        "sys_admin": null,
+        "twoOrgName": "定开支持部",
+        "rankReportId": "6",
+        "respUserName": null,
+        "system_label": "一般系统",
+        "threeOrgName": "定开支持部",
+        "rankReportName": "定级备案名称5"
+    },
+    {
+        "id": "zhihui_10",
+        "name": "testdd(已删除)",
+        "rank": "-1",
+        "orgId": 60003,
+        "buz_id": 10,
+        "sys_admin": null,
+        "twoOrgName": "研发中心",
+        "rankReportId": "10",
+        "respUserName": null,
+        "system_label": "一般系统",
+        "threeOrgName": "研发中心",
+        "rankReportName": "1111"
+    },
+    {
+        "id": "zhihui_12",
+        "name": "准入系统(已删除)",
+        "rank": "4",
+        "orgId": 60003,
+        "buz_id": 12,
+        "sys_admin": "70C614759B62EC0E88CF6BAB67322CF3",
+        "twoOrgName": "研发中心",
+        "rankReportId": "12",
+        "respUserName": null,
+        "system_label": "一般系统",
+        "threeOrgName": "研发中心",
+        "rankReportName": "视频准入系统V1.0"
+    },
+    {
+        "id": "zhihui_13",
+        "name": "二级013333",
+        "rank": "4",
+        "orgId": 60005,
+        "buz_id": 13,
+        "sys_admin": "1280B0991810516F1556A0E71A16EB0E",
+        "twoOrgName": "一级01",
+        "rankReportId": "13",
+        "respUserName": null,
+        "system_label": "一般系统",
+        "threeOrgName": "一级01",
+        "rankReportName": "定级备案名称6"
+    },
+    {
+        "id": "zhihui_14",
+        "name": "三级01",
+        "rank": "0",
+        "orgId": 60006,
+        "buz_id": 14,
+        "sys_admin": null,
+        "twoOrgName": "二级01-02",
+        "rankReportId": "14",
+        "respUserName": null,
+        "system_label": "一般系统",
+        "threeOrgName": "二级01-02",
+        "rankReportName": "定级备案名称7"
+    },
+    {
+        "id": "zhihui_15",
+        "name": "二级02",
+        "rank": "1",
+        "orgId": 60007,
+        "buz_id": 15,
+        "sys_admin": "E19A7D178827B56324AE6D0FD448D73E",
+        "twoOrgName": "一级02",
+        "rankReportId": "15",
+        "respUserName": null,
+        "system_label": "一般系统",
+        "threeOrgName": "一级02",
+        "rankReportName": "定级备案名称8"
+    },
+    {
+        "id": "zhihui_16",
+        "name": "数管",
+        "rank": "2",
+        "orgId": 60008,
+        "buz_id": 16,
+        "sys_admin": null,
+        "twoOrgName": "开发部",
+        "rankReportId": "16",
+        "respUserName": null,
+        "system_label": "一般系统",
+        "threeOrgName": "开发部",
+        "rankReportName": "定级备案名称9"
+    },
+    {
+        "id": "zhihui_17",
+        "name": "人员管理系统",
+        "rank": "-1",
+        "orgId": 60009,
+        "buz_id": 17,
+        "sys_admin": "",
+        "twoOrgName": "设计部",
+        "rankReportId": "17",
+        "respUserName": null,
+        "system_label": "一般系统",
+        "threeOrgName": "设计部",
+        "rankReportName": "定级备案名称10"
+    },
+    {
+        "id": "zhihui_19",
+        "name": "03",
+        "rank": "-1",
+        "orgId": 60010,
+        "buz_id": 19,
+        "sys_admin": "",
+        "twoOrgName": "一级03",
+        "rankReportId": "19",
+        "respUserName": null,
+        "system_label": "一般系统",
+        "threeOrgName": "一级03",
+        "rankReportName": "定级备案名称11"
+    },
+    {
+        "id": "zhihui_20",
+        "name": "测试业务系统",
+        "rank": "-1",
+        "orgId": 60012,
+        "buz_id": 20,
+        "sys_admin": "",
+        "twoOrgName": "测试部门",
+        "rankReportId": "20",
+        "respUserName": null,
+        "system_label": "一般系统",
+        "threeOrgName": "测试部门",
+        "rankReportName": "中国移动辽宁公司CRM系统"
+    },
+    {
+        "id": "zhihui_21",
+        "name": "测试业务系统0002",
+        "rank": "3",
+        "orgId": 60012,
+        "buz_id": 21,
+        "sys_admin": "",
+        "twoOrgName": "测试部门",
+        "rankReportId": "21",
+        "respUserName": null,
+        "system_label": "一般系统",
+        "threeOrgName": "测试部门",
+        "rankReportName": "定级备案名称13"
+    },
+    {
+        "id": "zhihui_23",
+        "name": "模压飞洒房",
+        "rank": "2",
+        "orgId": 60010,
+        "buz_id": 23,
+        "sys_admin": "",
+        "twoOrgName": "一级03",
+        "rankReportId": "23",
+        "respUserName": null,
+        "system_label": "一般系统",
+        "threeOrgName": "一级03",
+        "rankReportName": "发撒方法"
+    },
+    {
+        "id": "zhihui_24",
+        "name": "1->1",
+        "rank": "0",
+        "orgId": 60000,
+        "buz_id": 24,
+        "sys_admin": "",
+        "twoOrgName": "默认部门",
+        "rankReportId": "24",
+        "respUserName": null,
+        "system_label": "一般系统",
+        "threeOrgName": "默认部门",
+        "rankReportName": "111111"
+    },
+    {
+        "id": "zhihui_25",
+        "name": "全国水土保持信息管理系统",
+        "rank": "4",
+        "orgId": 60015,
+        "buz_id": 25,
+        "sys_admin": "",
+        "twoOrgName": "金水",
+        "rankReportId": "25",
+        "respUserName": null,
+        "system_label": "一般系统",
+        "threeOrgName": "金水",
+        "rankReportName": "定级备案名称14"
+    },
+    {
+        "id": "zhihui_26",
+        "name": "2-1",
+        "rank": "0",
+        "orgId": 60000,
+        "buz_id": 26,
+        "sys_admin": "",
+        "twoOrgName": "默认部门",
+        "rankReportId": "26",
+        "respUserName": null,
+        "system_label": "一般系统",
+        "threeOrgName": "默认部门",
+        "rankReportName": "测试"
+    },
+    {
+        "id": "zhihui_27",
+        "name": "成都测试系统",
+        "rank": "-1",
+        "orgId": 60003,
+        "buz_id": 27,
+        "sys_admin": "70C614759B62EC0E88CF6BAB67322CF3",
+        "twoOrgName": "研发中心",
+        "rankReportId": "27",
+        "respUserName": null,
+        "system_label": "一般系统",
+        "threeOrgName": "研发中心",
+        "rankReportName": "中国电信上海公司支撑网新CRM系统"
+    },
+    {
+        "id": "zhihui_28",
+        "name": "1",
+        "rank": "0",
+        "orgId": 60013,
+        "buz_id": 28,
+        "sys_admin": "",
+        "twoOrgName": "测试",
+        "rankReportId": "28",
+        "respUserName": null,
+        "system_label": "一般系统",
+        "threeOrgName": "测试",
+        "rankReportName": "1"
+    },
+    {
+        "id": "zhihui_32",
+        "name": "yyyy",
+        "rank": "",
+        "orgId": 60002,
+        "buz_id": 32,
+        "sys_admin": "",
+        "twoOrgName": "定开支持部",
+        "rankReportId": "32",
+        "respUserName": null,
+        "system_label": "一般系统",
+        "threeOrgName": "定开支持部",
+        "rankReportName": "yyyy"
+    },
+    {
+        "id": "zhihui_33",
+        "name": "测试业务提供1",
+        "rank": "",
+        "orgId": 60000,
+        "buz_id": 33,
+        "sys_admin": "",
+        "twoOrgName": "默认部门",
+        "rankReportId": "33",
+        "respUserName": null,
+        "system_label": "一般系统",
+        "threeOrgName": "默认部门",
+        "rankReportName": "测试业务提供1"
+    },
+    {
+        "id": "zhihui_34",
+        "name": "测试002",
+        "rank": "",
+        "orgId": 60000,
+        "buz_id": 34,
+        "sys_admin": "",
+        "twoOrgName": "默认部门",
+        "rankReportId": "34",
+        "respUserName": null,
+        "system_label": "一般系统",
+        "threeOrgName": "默认部门",
+        "rankReportName": "测试002"
+    },
+    {
+        "id": "zhihui_35",
+        "name": "test11",
+        "rank": "-1",
+        "orgId": 60005,
+        "buz_id": 35,
+        "sys_admin": "B2DC9D6BEE35511022E4E11B025D31B9",
+        "twoOrgName": "一级01",
+        "rankReportId": "35",
+        "respUserName": null,
+        "system_label": "一般系统",
+        "threeOrgName": "一级01",
+        "rankReportName": "测试定级"
+    },
+    {
+        "id": "zhihui_36",
+        "name": "test",
+        "rank": "0",
+        "orgId": 60000,
+        "buz_id": 36,
+        "sys_admin": "70C614759B62EC0E88CF6BAB67322CF3",
+        "twoOrgName": "默认部门",
+        "rankReportId": "36",
+        "respUserName": "2260DD6528E73D0EFDEEBDC2F20D2E14F530F91AC2F22D28B65544C1907D5930",
+        "system_label": "一般系统",
+        "threeOrgName": "默认部门",
+        "rankReportName": "定级备案名称2"
+    },
+    {
+        "id": "zhihui_sys_371",
+        "name": "三七业务",
+        "rank": "0",
+        "orgId": 60003,
+        "buz_id": 37,
+        "sys_admin": "4406A9F81D1F60B668F51048CBF068A1",
+        "twoOrgName": "研发中心",
+        "rankReportId": "37",
+        "respUserName": "2260DD6528E73D0EFDEEBDC2F20D2E14256ABAD90445BFD980960E94AE31F663",
+        "system_label": "一般系统",
+        "threeOrgName": "研发中心",
+        "rankReportName": "定级备案名称2"
+    },
+    {
+        "id": "zhihui_123",
+        "name": "123",
+        "rank": "3",
+        "orgId": 60010,
+        "buz_id": 38,
+        "sys_admin": "235B0474B8CCBDA798A0327D2E49F7FD",
+        "twoOrgName": "一级03",
+        "rankReportId": "38",
+        "respUserName": "3D70B22C02DDDDF19A35556873395F0D",
+        "system_label": "一般系统",
+        "threeOrgName": "一级03",
+        "rankReportName": "测试业务系统"
+    },
+    {
+        "id": "zhihui_39",
+        "name": "测试业务系统",
+        "rank": null,
+        "orgId": 60002,
+        "buz_id": 39,
+        "sys_admin": null,
+        "twoOrgName": "定开支持部",
+        "rankReportId": "39",
+        "respUserName": null,
+        "system_label": "一般系统",
+        "threeOrgName": "定开支持部",
+        "rankReportName": "测试业务系统"
+    },
+    {
+        "id": "zhihui_40",
+        "name": "移动维护运营室_无归属资产",
+        "rank": "-1",
+        "orgId": 60002,
+        "buz_id": 40,
+        "sys_admin": "235B0474B8CCBDA798A0327D2E49F7FD",
+        "twoOrgName": "定开支持部",
+        "rankReportId": "40",
+        "respUserName": null,
+        "system_label": "一般系统",
+        "threeOrgName": "定开支持部",
+        "rankReportName": "移动维护运营室_无归属资产"
+    },
+    {
+        "id": "zhihui_41",
+        "name": "云和平台运营室_无归属资产",
+        "rank": null,
+        "orgId": 60002,
+        "buz_id": 41,
+        "sys_admin": null,
+        "twoOrgName": "定开支持部",
+        "rankReportId": "41",
+        "respUserName": null,
+        "system_label": "一般系统",
+        "threeOrgName": "定开支持部",
+        "rankReportName": "云和平台运营室_无归属资产"
+    },
+    {
+        "id": "zhihui_42",
+        "name": "CRM运维管理平台",
+        "rank": "-1",
+        "orgId": 60000,
+        "buz_id": 42,
+        "sys_admin": "E19A7D178827B56324AE6D0FD448D73E",
+        "twoOrgName": "默认部门",
+        "rankReportId": "42",
+        "respUserName": null,
+        "system_label": "一般系统",
+        "threeOrgName": "默认部门",
+        "rankReportName": "CRM运维管理平台"
+    }
+]
+`
