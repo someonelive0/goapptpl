@@ -199,10 +199,10 @@ func (p *ApiServer) initRoute(app *fiber.App) error {
 	// app.GET("/config", handler.handleConfig)
 	// app.GET("/health", handler.handleHealth)
 	// app.GET("/cache", handler.handleCache)
-	app.Get("/", func(c fiber.Ctx) error {
-		return fiber.NewError(500, "Custom error message")
+	app.Route("/").Get(func(c fiber.Ctx) error {
+		return fiber.NewError(400, "please access /meta/status")
 	})
-	app.Get("/meta/status", func(c fiber.Ctx) error {
+	app.Route("/meta/status").Get(func(c fiber.Ctx) error {
 		s := fmt.Sprintf(`{ "status": "%s", "runtime": "%s" }`,
 			"running", START_TIME.Format(time.RFC3339)) // "2006-01-02 15:04:05"
 		return c.SendString(s)
