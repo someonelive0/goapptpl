@@ -83,7 +83,14 @@ func (p *MysqlHandler) tablesHandler(c fiber.Ctx) error {
 		}
 
 		ch := make(chan string, 100)
-		go p.sql2chan(ch, sqltext)
+		go func() {
+			if err := p.sql2chan(ch, sqltext); err != nil {
+				// log.Errorf("sql2chan failed: %v", err)
+				c.Status(fiber.StatusInternalServerError).SendString(err.Error()) // 500
+				c.Response().ConnectionClose()
+				close(ch)
+			}
+		}()
 
 		c.Context().SetContentType("application/json")
 		c.WriteString("[")
