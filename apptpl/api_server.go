@@ -199,8 +199,11 @@ func (p *ApiServer) initRoute(app *fiber.App) error {
 	// app.GET("/config", handler.handleConfig)
 	// app.GET("/health", handler.handleHealth)
 	// app.GET("/cache", handler.handleCache)
+
+	// app.Use(recover.New())
 	app.Route("/").Get(func(c fiber.Ctx) error {
-		return fiber.NewError(400, "please access /meta/status")
+		return fiber.NewError(fiber.StatusServiceUnavailable, "please access /meta/status")
+		// return fiber.NewError(400, "please access /meta/status")
 	})
 	app.Route("/meta/status").Get(func(c fiber.Ctx) error {
 		s := fmt.Sprintf(`{ "status": "%s", "runtime": "%s" }`,
@@ -270,17 +273,17 @@ func (p *ApiServer) authMiddleware(c fiber.Ctx) error {
 }
 
 func (p *ApiServer) ticketHandler(c fiber.Ctx) error {
-	log.Debugf("headers: %v", c.GetReqHeaders())
-	log.Debugf("body: %s", c.Body())
+	log.Tracef("headers: %v", c.GetReqHeaders())
+	log.Tracef("body: %s", c.Body())
 
 	m := make(map[string]string)
 	if err := json.Unmarshal(c.Body(), &m); err != nil {
 		log.Errorf("json.Unmarshal error: %#v", err)
 		return err
 	}
-	log.Debugf("request appCode: %#v", m["appCode"])
-	log.Debugf("request tenant: %#v", m["tenant"])
-	log.Debugf("request ticket/data: %#v", m["data"])
+	log.Tracef("request appCode: %#v", m["appCode"])
+	log.Tracef("request tenant: %#v", m["tenant"])
+	log.Tracef("request ticket/data: %#v", m["data"])
 
 	resp := `{
 		"retCode": "1000",
@@ -308,8 +311,8 @@ func (p *ApiServer) aiAnalyzeriskHandler(c fiber.Ctx) error {
 	// test failed response
 	// return fiber.NewError(400, `{ "detail": "AI模型分析失败" }`)
 
-	// log.Debugf("headers: %v", c.GetReqHeaders())
-	log.Debugf("body: %s", c.Body())
+	// log.Tracef("headers: %v", c.GetReqHeaders())
+	log.Tracef("body: %s", c.Body())
 
 	m := make(map[string]interface{})
 	if err := json.Unmarshal(c.Body(), &m); err != nil {
@@ -319,16 +322,16 @@ func (p *ApiServer) aiAnalyzeriskHandler(c fiber.Ctx) error {
 	if _, ok := m["inputs"]; !ok {
 		return fiber.NewError(400, "inputs is required")
 	}
-	// log.Debugf("request inputs: %#v", m["inputs"])
-	// log.Debugf("request tenant: %#v", m["tenant"])
-	// log.Debugf("request ticket/data: %#v", m["data"])
+	// log.Tracef("request inputs: %#v", m["inputs"])
+	// log.Tracef("request tenant: %#v", m["tenant"])
+	// log.Tracef("request ticket/data: %#v", m["data"])
 
 	resp := `{
 		"detail": "success",
 		"output": [`
 	inputs := m["inputs"].([]interface{})
 	for i, input := range inputs {
-		log.Debugf("request input: %#v", input)
+		log.Tracef("request input: %#v", input)
 		if i > 0 {
 			resp += ", "
 		}
@@ -348,7 +351,7 @@ func (p *ApiServer) aiAnalyzeriskHandler(c fiber.Ctx) error {
 	resp += `
 	] }`
 
-	log.Debugf("response: |%s|", resp)
+	log.Tracef("response: |%s|", resp)
 	if err := json.Unmarshal([]byte(resp), &m); err != nil {
 		log.Errorf("json.Unmarshal resp error: %#v", err)
 		return err
@@ -365,8 +368,8 @@ func (p *ApiServer) aiDataidentifyHandler(c fiber.Ctx) error {
 	// test failed response
 	// return fiber.NewError(400, `{ "detail": "AI模型分析重要数据失败" }`)
 
-	// log.Debugf("headers: %v", c.GetReqHeaders())
-	log.Debugf("body: %s", c.Body())
+	// log.Tracef("headers: %v", c.GetReqHeaders())
+	log.Tracef("body: %s", c.Body())
 
 	m := make(map[string]interface{})
 	if err := json.Unmarshal(c.Body(), &m); err != nil {
@@ -376,16 +379,16 @@ func (p *ApiServer) aiDataidentifyHandler(c fiber.Ctx) error {
 	if _, ok := m["inputs"]; !ok {
 		return fiber.NewError(400, "inputs is required")
 	}
-	// log.Debugf("request inputs: %#v", m["inputs"])
-	// log.Debugf("request tenant: %#v", m["tenant"])
-	// log.Debugf("request ticket/data: %#v", m["data"])
+	// log.Tracef("request inputs: %#v", m["inputs"])
+	// log.Tracef("request tenant: %#v", m["tenant"])
+	// log.Tracef("request ticket/data: %#v", m["data"])
 
 	resp := `{
 		"detail": "ok",
 		"output": [`
 	inputs := m["inputs"].([]interface{})
 	for i, input := range inputs {
-		log.Debugf("request input: %#v", input)
+		log.Tracef("request input: %#v", input)
 		if i > 0 {
 			resp += ", "
 		}
@@ -404,7 +407,7 @@ func (p *ApiServer) aiDataidentifyHandler(c fiber.Ctx) error {
 	resp += `
 	] }`
 
-	log.Debugf("response: |%s|", resp)
+	log.Tracef("response: |%s|", resp)
 	if err := json.Unmarshal([]byte(resp), &m); err != nil {
 		log.Errorf("json.Unmarshal resp error: %#v", err)
 		return err
@@ -417,16 +420,16 @@ func (p *ApiServer) aiDataidentifyHandler(c fiber.Ctx) error {
 }
 
 func (p *ApiServer) buzHandler(c fiber.Ctx) error {
-	log.Debugf("headers: %v", c.GetReqHeaders())
-	log.Debugf("body: %s", c.Body())
+	log.Tracef("headers: %v", c.GetReqHeaders())
+	log.Tracef("body: %s", c.Body())
 
 	m := make(map[string]int)
 	if err := json.Unmarshal(c.Body(), &m); err != nil {
 		log.Errorf("json.Unmarshal error: %#v", err)
 		return err
 	}
-	log.Debugf("request pageNo: %d", m["pageNo"])
-	log.Debugf("request pageSize: %d", m["pageSize"])
+	log.Tracef("request pageNo: %d", m["pageNo"])
+	log.Tracef("request pageSize: %d", m["pageSize"])
 
 	var pageNo int = 1
 	var pageSize int = 100
@@ -443,9 +446,9 @@ func (p *ApiServer) buzHandler(c fiber.Ctx) error {
 
 	buzs := make([]map[string]interface{}, 0)
 	json.Unmarshal([]byte(zhihui_buz), &buzs)
-	log.Debugf("zhihui_buz number: %d", len(buzs))
+	log.Tracef("zhihui_buz number: %d", len(buzs))
 	// for i, buz := range buzs {
-	// 	log.Debugf("zhihui_buz %d : %v", i, buz)
+	// 	log.Tracef("zhihui_buz %d : %v", i, buz)
 	// }
 
 	offset0 := (pageNo - 1) * pageSize
@@ -456,8 +459,8 @@ func (p *ApiServer) buzHandler(c fiber.Ctx) error {
 	if offset1 > len(buzs) {
 		offset1 = len(buzs)
 	}
-	log.Debugf("pageNo %d, pageSize %d", pageNo, pageSize)
-	log.Debugf("offset from %d to %d", offset0, offset1)
+	log.Tracef("pageNo %d, pageSize %d", pageNo, pageSize)
+	log.Tracef("offset from %d to %d", offset0, offset1)
 
 	c.Context().SetContentType("application/json")
 
