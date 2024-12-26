@@ -19,7 +19,7 @@ type HardwareHandler struct {
 
 // r := app.Group("/hardware")
 func (p *HardwareHandler) AddRouter(r fiber.Router) error {
-	log.Info("MysqlHandler AddRouter")
+	log.Info("HardwareHandler AddRouter")
 
 	r.Get("", p.hdHandler)
 	r.Get("/", p.hdHandler)
@@ -40,7 +40,7 @@ func (p *HardwareHandler) AddRouter(r fiber.Router) error {
 // GET /hardware/cpu
 func (p *HardwareHandler) hdHandler(c fiber.Ctx) error {
 	c.Context().SetContentType("text/html")
-	c.WriteString(`<html><body><h1>Hardware</h1>
+	c.WriteString(`<html><body><h1>Hardware Information</h1>
 	<a href="/hardware/cpu">cpu</a><br>
 	<a href="/hardware/mem">mem</a><br>
 	<a href="/hardware/block">block</a><br>

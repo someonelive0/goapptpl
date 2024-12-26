@@ -27,6 +27,7 @@ type ApiServer struct {
 	ckHdl       *ClickhouseHandler
 	pgHdl       *PgHandler
 	hardwareHdl *HardwareHandler
+	hostHdl     *HostHandler
 
 	mycache *cache.Cache
 }
@@ -73,6 +74,10 @@ func (p *ApiServer) Start() error {
 	hardwareHdl := HardwareHandler{Mycache: p.mycache}
 	hardwareHdl.AddRouter(app.Group("/hardware"))
 
+	// add HostHandler
+	hostHdl := HostHandler{Mycache: p.mycache}
+	hostHdl.AddRouter(app.Group("/host"))
+
 	// data, _ := json.MarshalIndent(app.Stack(), "", "  ")
 	// log.Debug(string(data))
 	// data, _ = json.MarshalIndent(app.Config(), "", "  ")
@@ -85,6 +90,7 @@ func (p *ApiServer) Start() error {
 	p.ckHdl = &ckHdl
 	p.pgHdl = &pgHdl
 	p.hardwareHdl = &hardwareHdl
+	p.hostHdl = &hostHdl
 
 	// use CertFile and CertKeyFile to listen https
 	// 正常时阻塞在这里
