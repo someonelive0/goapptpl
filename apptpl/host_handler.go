@@ -24,9 +24,10 @@ type HostHandler struct {
 func (p *HostHandler) AddRouter(r fiber.Router) error {
 	log.Info("HostHandler AddRouter")
 
-	r.Get("", p.hdHandler)
-	r.Get("/", p.hdHandler)
+	r.Get("", p.homeHandler)
+	r.Get("/", p.homeHandler)
 	r.Get("/os", p.osHandler)
+	r.Get("/user", p.userHandler)
 	r.Get("/cpu", p.cpuHandler)
 	r.Get("/loading", p.loadingHandler)
 	r.Get("/mem", p.memHandler)
@@ -38,10 +39,11 @@ func (p *HostHandler) AddRouter(r fiber.Router) error {
 }
 
 // GET /host/cpu
-func (p *HostHandler) hdHandler(c fiber.Ctx) error {
+func (p *HostHandler) homeHandler(c fiber.Ctx) error {
 	c.Context().SetContentType("text/html")
 	c.WriteString(`<html><body><h1>Host Information</h1>
 	<a href="/host/os">os</a><br>
+	<a href="/host/user">user</a><br>
 	<a href="/host/cpu">cpu</a><br>
 	<a href="/host/loading">loading</a><br>
 	<a href="/host/mem">mem</a><br>
@@ -80,13 +82,19 @@ func (p *HostHandler) osHandler(c fiber.Ctx) error {
 	b, _ := json.MarshalIndent(info, "", " ")
 	c.Write(b[1:])
 
+	return nil
+}
+
+// GET /host/user
+func (p *HostHandler) userHandler(c fiber.Ctx) error {
 	users, err := host.Users()
 	if err != nil {
 		log.Warnf("get host users failed: %v", err)
-	} else {
-		b, _ = json.MarshalIndent(users, "", " ")
-		c.Write(b)
+		return err
 	}
+
+	b, _ := json.MarshalIndent(users, "", " ")
+	c.Write(b)
 
 	return nil
 }
