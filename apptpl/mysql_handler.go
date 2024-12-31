@@ -37,11 +37,25 @@ func (p *MysqlHandler) AddRouter(r fiber.Router) error {
 	r.Get("", p.homeHandler)
 	r.Get("/", p.homeHandler)
 	r.Get("/tables", p.tablesHandler)
-	// r.Get("/tables", p.viewsHandler)
+	r.Get("/table/:table", p.tableHandler)
 	r.Get("/table/:table/columns", p.columnsHandler)
 	r.Get("/table/:table/indexes", p.indexesHandler)
-	r.Get("/table/:table", p.tableHandler)
+	r.Get("/table/:table/constraints", p.constraintsHandler) // 表约束
+	r.Get("/table/:table/keys", p.keysHandler)               // 表外键
+	r.Get("/table/:table/references", p.referencesHandler)   // 表引用
+	r.Get("/table/:table/stats", p.statsHandler)             // 表统计
+	r.Get("/table/:table/describe", p.describeHandler)       // 表描述
 	r.Get("/table/:table/ddl", p.ddlHandler)
+	r.Get("/views", p.viewsHandler)
+	r.Get("/view/:table", p.tableHandler)
+	r.Get("/view/:table/columns", p.columnsHandler)
+	r.Get("/view/:table/indexes", p.indexesHandler)
+	r.Get("/view/:table/constraints", p.constraintsHandler) // 表约束
+	r.Get("/view/:table/keys", p.keysHandler)               // 表外键
+	r.Get("/view/:table/references", p.referencesHandler)   // 表引用
+	r.Get("/view/:table/stats", p.statsHandler)             // 表统计
+	r.Get("/view/:table/describe", p.describeHandler)       // 表描述
+	r.Get("/view/:table/ddl", p.ddlHandler)
 	r.Get("/procedures", p.proceduresHandler)
 	r.Get("/procedure/:procedure", p.procedureHandler)
 	r.Get("/events", p.eventsHandler)
@@ -66,7 +80,9 @@ func (p *MysqlHandler) homeHandler(c fiber.Ctx) error {
 	c.Context().SetContentType("text/html")
 	c.WriteString(`<html><body><h1>Mysql Information</h1>
 	<a href="/mysql/tables?mime=json">tables</a><br>
-	<a href="/mysql/table/:table?mime=json">tables/:table_name</a><br>
+	<a href="/mysql/table/:table?mime=json">table/:table_name/[columns|indexes|constraints|keys|references|stats|describe|ddl]</a><br>
+	<a href="/mysql/views?mime=json">views</a><br>
+	<a href="/mysql/view/:view?mime=json">view/:view_name/[columns|indexes|constraints|keys|references|stats|describe|ddl]</a><br>
 	<a href="/mysql/procedures">procedures</a><br>
 	<a href="/mysql/procedure/:procedure">procedure/:procedure_name</a><br>
 	<a href="/mysql/events">events</a><br>
@@ -77,9 +93,20 @@ func (p *MysqlHandler) homeHandler(c fiber.Ctx) error {
 	return nil
 }
 
+// GET /mysql/views?mime=excel|json
+// mysql json_object() 不保证字段顺序，所以excel格式化时，需要按顺序
+func (p *MysqlHandler) viewsHandler(c fiber.Ctx) error {
+	return p.tablesViewsHandler(c, "VIEW")
+}
+
 // GET /mysql/tables?mime=excel|json
 // mysql json_object() 不保证字段顺序，所以excel格式化时，需要按顺序
 func (p *MysqlHandler) tablesHandler(c fiber.Ctx) error {
+	return p.tablesViewsHandler(c, "BASE TABLE")
+}
+
+// table_type is "BASE TABLE" or "VIEW"
+func (p *MysqlHandler) tablesViewsHandler(c fiber.Ctx, table_type string) error {
 	sqltext := `
 	select json_object(
 		'table_catalog', table_catalog,
@@ -87,16 +114,18 @@ func (p *MysqlHandler) tablesHandler(c fiber.Ctx) error {
 		'table_name', table_name,
 		'table_type', table_type,
 		'table_rows', table_rows,
-		'table_rows', table_rows,
 		'avg_row_length', avg_row_length,
 		'data_length', data_length,
+		'max_data_length', max_data_length,
 		'index_length', index_length,
+		'data_free', data_free,
 		'create_time', create_time,
 		'table_collation', table_collation,
 		'table_comment', table_comment
 		) as json
 	from INFORMATION_SCHEMA.TABLES
-	where table_schema = '` + p.cfg.DBName + `'`
+	where table_schema = '` + p.cfg.DBName + `'` +
+		`and table_type = '` + table_type + `'`
 
 	mime := c.Query("mime", "json") // if Queries params mime is not set, default to json
 	switch mime {
@@ -370,6 +399,61 @@ func (p *MysqlHandler) tableHandler(c fiber.Ctx) error {
 		c.SendString(fmt.Sprintf("mime '%s' not supported", mime))
 		return nil
 	}
+}
+
+// GET /mysql/table/:table/constraints 表约束
+func (p *MysqlHandler) constraintsHandler(c fiber.Ctx) error {
+	table, _ := url.QueryUnescape(c.Params("table"))
+	sqltext := fmt.Sprintf(`
+	SELECT CONSTRAINT_NAME, CONSTRAINT_TYPE, TABLE_NAME
+	FROM information_schema.TABLE_CONSTRAINTS
+	WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s'`,
+		p.cfg.DBName, table)
+
+	return p.sqlHandler2Json(c, sqltext)
+}
+
+// GET /mysql/table/:table/keys 表外键
+func (p *MysqlHandler) keysHandler(c fiber.Ctx) error {
+	table, _ := url.QueryUnescape(c.Params("table"))
+	sqltext := fmt.Sprintf(`
+	select * from information_schema.key_column_usage
+	where REFERENCED_TABLE_NAME != null
+	and TABLE_SCHEMA = '%s' and TABLE_NAME = '%s'`,
+		p.cfg.DBName, table)
+
+	return p.sqlHandler2Json(c, sqltext)
+}
+
+// GET /mysql/table/:table/references 表引用
+func (p *MysqlHandler) referencesHandler(c fiber.Ctx) error {
+	table, _ := url.QueryUnescape(c.Params("table"))
+	sqltext := fmt.Sprintf(`
+	select * from information_schema.key_column_usage
+	where REFERENCED_TABLE_SCHEMA = '%s' and REFERENCED_TABLE_NAME = '%s'`,
+		p.cfg.DBName, table)
+
+	return p.sqlHandler2Json(c, sqltext)
+}
+
+// GET /mysql/table/:table/stats 表统计
+func (p *MysqlHandler) statsHandler(c fiber.Ctx) error {
+	table, _ := url.QueryUnescape(c.Params("table"))
+	sqltext := fmt.Sprintf(`
+	select * from information_schema.tables
+	where TABLE_SCHEMA = '%s' and TABLE_NAME = '%s'`,
+		p.cfg.DBName, table)
+
+	return p.sqlHandler2Json(c, sqltext)
+}
+
+// GET /mysql/table/:table/describe 表描述
+func (p *MysqlHandler) describeHandler(c fiber.Ctx) error {
+	table, _ := url.QueryUnescape(c.Params("table"))
+	sqltext := fmt.Sprintf(`
+	describe %s`, table)
+
+	return p.sqlHandler2Json(c, sqltext)
 }
 
 // GET /mysql/table/:table/ddl
