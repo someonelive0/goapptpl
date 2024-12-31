@@ -43,6 +43,7 @@ func (p *MysqlHandler) AddRouter(r fiber.Router) error {
 	r.Get("/table/:table/constraints", p.constraintsHandler) // 表约束
 	r.Get("/table/:table/keys", p.keysHandler)               // 表外键
 	r.Get("/table/:table/references", p.referencesHandler)   // 表引用
+	r.Get("/table/:table/triggers", p.tableTriggersHandler)  // 表触发器
 	r.Get("/table/:table/stats", p.statsHandler)             // 表统计
 	r.Get("/table/:table/describe", p.describeHandler)       // 表描述
 	r.Get("/table/:table/ddl", p.ddlHandler)
@@ -53,6 +54,7 @@ func (p *MysqlHandler) AddRouter(r fiber.Router) error {
 	r.Get("/view/:table/constraints", p.constraintsHandler) // 表约束
 	r.Get("/view/:table/keys", p.keysHandler)               // 表外键
 	r.Get("/view/:table/references", p.referencesHandler)   // 表引用
+	r.Get("/view/:table/triggers", p.tableTriggersHandler)  // 表触发器
 	r.Get("/view/:table/stats", p.statsHandler)             // 表统计
 	r.Get("/view/:table/describe", p.describeHandler)       // 表描述
 	r.Get("/view/:table/ddl", p.ddlHandler)
@@ -80,9 +82,9 @@ func (p *MysqlHandler) homeHandler(c fiber.Ctx) error {
 	c.Context().SetContentType("text/html")
 	c.WriteString(`<html><body><h1>Mysql Information</h1>
 	<a href="/mysql/tables?mime=json">tables</a><br>
-	<a href="/mysql/table/:table?mime=json">table/:table_name/[columns|indexes|constraints|keys|references|stats|describe|ddl]</a><br>
+	<a href="/mysql/table/:table?mime=json">table/:table_name/[columns|indexes|constraints|keys|references|triggers|stats|describe|ddl]</a><br>
 	<a href="/mysql/views?mime=json">views</a><br>
-	<a href="/mysql/view/:view?mime=json">view/:view_name/[columns|indexes|constraints|keys|references|stats|describe|ddl]</a><br>
+	<a href="/mysql/view/:view?mime=json">view/:view_name/[columns|indexes|constraints|keys|references|triggers|stats|describe|ddl]</a><br>
 	<a href="/mysql/procedures">procedures</a><br>
 	<a href="/mysql/procedure/:procedure">procedure/:procedure_name</a><br>
 	<a href="/mysql/events">events</a><br>
@@ -431,6 +433,17 @@ func (p *MysqlHandler) referencesHandler(c fiber.Ctx) error {
 	sqltext := fmt.Sprintf(`
 	select * from information_schema.key_column_usage
 	where REFERENCED_TABLE_SCHEMA = '%s' and REFERENCED_TABLE_NAME = '%s'`,
+		p.cfg.DBName, table)
+
+	return p.sqlHandler2Json(c, sqltext)
+}
+
+// GET /mysql/table/:table/triggers 表触发器
+func (p *MysqlHandler) tableTriggersHandler(c fiber.Ctx) error {
+	table, _ := url.QueryUnescape(c.Params("table"))
+	sqltext := fmt.Sprintf(`
+	select * from information_schema.triggers 
+	where EVENT_OBJECT_SCHEMA = '%s' and EVENT_OBJECT_TABLE = '%s'`,
 		p.cfg.DBName, table)
 
 	return p.sqlHandler2Json(c, sqltext)
