@@ -38,7 +38,7 @@ func (p *HostHandler) AddRouter(r fiber.Router) error {
 	return nil
 }
 
-// GET /host/cpu
+// GET /host
 func (p *HostHandler) homeHandler(c fiber.Ctx) error {
 	c.Context().SetContentType("text/html")
 	c.WriteString(`<html><body><h1>Host Information</h1>

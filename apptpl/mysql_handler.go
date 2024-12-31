@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/url"
@@ -33,10 +34,20 @@ type MysqlHandler struct {
 func (p *MysqlHandler) AddRouter(r fiber.Router) error {
 	log.Info("MysqlHandler AddRouter")
 
+	r.Get("", p.homeHandler)
+	r.Get("/", p.homeHandler)
 	r.Get("/tables", p.tablesHandler)
+	// r.Get("/tables", p.viewsHandler)
 	r.Get("/table/:table/columns", p.columnsHandler)
 	r.Get("/table/:table/indexes", p.indexesHandler)
 	r.Get("/table/:table", p.tableHandler)
+	r.Get("/table/:table/ddl", p.ddlHandler)
+	r.Get("/procedures", p.proceduresHandler)
+	r.Get("/procedure/:procedure", p.procedureHandler)
+	r.Get("/events", p.eventsHandler)
+	r.Get("/event/:event", p.eventHandler)
+	r.Get("/triggers", p.triggersHandler)
+	r.Get("/trigger/:trigger", p.triggerHandler)
 
 	//解析DSN字符串
 	cfg, err := mysql.ParseDSN(p.Dbconfig.Dsn[0])
@@ -47,6 +58,22 @@ func (p *MysqlHandler) AddRouter(r fiber.Router) error {
 	p.cfg = cfg
 	// log.Debugf("mysql cfg: %#v", cfg)
 
+	return nil
+}
+
+// GET /mysql
+func (p *MysqlHandler) homeHandler(c fiber.Ctx) error {
+	c.Context().SetContentType("text/html")
+	c.WriteString(`<html><body><h1>Mysql Information</h1>
+	<a href="/mysql/tables?mime=json">tables</a><br>
+	<a href="/mysql/table/:table?mime=json">tables/:table_name</a><br>
+	<a href="/mysql/procedures">procedures</a><br>
+	<a href="/mysql/procedure/:procedure">procedure/:procedure_name</a><br>
+	<a href="/mysql/events">events</a><br>
+	<a href="/mysql/event/:event">event/:event_name</a><br>
+	<a href="/mysql/triggers">triggers</a><br>
+	<a href="/mysql/trigger/:trigger">trigger/:trigger_name</a><br>
+	</body></html>`)
 	return nil
 }
 
@@ -74,7 +101,7 @@ func (p *MysqlHandler) tablesHandler(c fiber.Ctx) error {
 	mime := c.Query("mime", "json") // if Queries params mime is not set, default to json
 	switch mime {
 	case "json":
-		// return p.sqlHandler(c, sqltext)
+		// return p.sqlHandlerByJson(c, sqltext)
 		// use local cache to reduce mysql load
 		if b, found := p.Mycache.Get("mysql:tables"); found {
 			c.Context().SetContentType("application/json")
@@ -180,7 +207,7 @@ func (p *MysqlHandler) columnsHandler(c fiber.Ctx) error {
 	mime := c.Query("mime", "json") // if Queries params mime is not set, default to json
 	switch mime {
 	case "json":
-		return p.sqlHandler(c, sqltext)
+		return p.sqlHandlerByJson(c, sqltext)
 
 	case "excel":
 		filename := table + "-columns.xlsx"
@@ -253,7 +280,7 @@ func (p *MysqlHandler) indexesHandler(c fiber.Ctx) error {
 	mime := c.Query("mime", "json") // if Queries params mime is not set, default to json
 	switch mime {
 	case "json":
-		return p.sqlHandler(c, sqltext)
+		return p.sqlHandlerByJson(c, sqltext)
 
 	case "excel":
 		filename := table + "-indexs.xlsx"
@@ -315,7 +342,7 @@ func (p *MysqlHandler) tableHandler(c fiber.Ctx) error {
 	switch mime {
 	case "json":
 		// TODO 当表数据行数很大时，会占用很大内存，应该改为流式处理
-		return p.sqlHandler(c, sqltext)
+		return p.sqlHandlerByJson(c, sqltext)
 
 	case "excel":
 		filename := table + ".xlsx"
@@ -345,8 +372,148 @@ func (p *MysqlHandler) tableHandler(c fiber.Ctx) error {
 	}
 }
 
-// write sql result to fiber response
-func (p *MysqlHandler) sqlHandler(c fiber.Ctx, sqltext string) error {
+// GET /mysql/table/:table/ddl
+func (p *MysqlHandler) ddlHandler(c fiber.Ctx) error {
+	table, _ := url.QueryUnescape(c.Params("table"))
+	sqltext := fmt.Sprintf(`
+	show create table %s`, table)
+
+	return p.sqlHandler2Json(c, sqltext)
+}
+
+// GET /mysql/procedures
+func (p *MysqlHandler) proceduresHandler(c fiber.Ctx) error {
+	sqltext := fmt.Sprintf(`SHOW PROCEDURE STATUS where db = '%s'`, p.cfg.DBName)
+
+	return p.sqlHandler2Json(c, sqltext)
+}
+
+// GET /mysql/procedure/:procedure
+func (p *MysqlHandler) procedureHandler(c fiber.Ctx) error {
+	procedure, _ := url.QueryUnescape(c.Params("procedure"))
+	sqltext := fmt.Sprintf(`SHOW CREATE PROCEDURE %s`, procedure)
+
+	return p.sqlHandler2Json(c, sqltext)
+}
+
+// GET /mysql/events
+func (p *MysqlHandler) eventsHandler(c fiber.Ctx) error {
+	sqltext := fmt.Sprintf(`SHOW EVENTS from %s`, p.cfg.DBName)
+
+	return p.sqlHandler2Json(c, sqltext)
+}
+
+// GET /mysql/event/:event
+func (p *MysqlHandler) eventHandler(c fiber.Ctx) error {
+	event, _ := url.QueryUnescape(c.Params("event"))
+	sqltext := fmt.Sprintf(`SHOW CREATE EVENT %s`, event)
+
+	return p.sqlHandler2Json(c, sqltext)
+}
+
+// GET /mysql/triggers
+func (p *MysqlHandler) triggersHandler(c fiber.Ctx) error {
+	sqltext := fmt.Sprintf(`SHOW triggers from %s`, p.cfg.DBName)
+
+	return p.sqlHandler2Json(c, sqltext)
+}
+
+// GET /mysql/trigger/:trigger
+func (p *MysqlHandler) triggerHandler(c fiber.Ctx) error {
+	trigger, _ := url.QueryUnescape(c.Params("trigger"))
+	sqltext := fmt.Sprintf(`SHOW CREATE trigger %s`, trigger)
+
+	return p.sqlHandler2Json(c, sqltext)
+}
+
+// write sql result from colums record to fiber response
+func (p *MysqlHandler) sqlHandler2Json(c fiber.Ctx, sqltext string) error {
+	log.Tracef("mysql sql: %s\n", sqltext)
+
+	if p.db == nil {
+		if err := p.openDB(); err != nil {
+			return err
+		}
+	}
+
+	rows, err := p.db.Query(sqltext)
+	if err != nil {
+		log.Error("Error executing query:", err)
+		c.WriteString(err.Error())
+		return err
+	}
+	defer rows.Close()
+
+	// c.Context().SetContentType("text/x-sql;charset=UTF-8") // text/plain;charset=UTF-8
+	c.Context().SetContentType("application/json")
+
+	columns, err := rows.Columns()
+	if err != nil {
+		log.Error("Error getting columns:", err)
+		return err
+	}
+	column_num := len(columns)
+
+	// 返回值 Map切片
+	// records := make([]map[string]interface{}, 0)
+	// 一条数据的各列的值（需要指定长度为列的个数，以便获取地址）
+	values := make([]interface{}, column_num)
+	// 一条数据的各列的值的地址
+	values_ptr := make([]interface{}, column_num)
+
+	c.WriteString("[")
+	i := 0
+	for rows.Next() {
+		// 获取各列的值的地址
+		for i := 0; i < column_num; i++ {
+			values_ptr[i] = &values[i]
+		}
+
+		// 扫描一行数据到值数组中
+		err = rows.Scan(values_ptr...)
+		if err != nil {
+			log.Error("Error scanning row:", err)
+			continue
+		}
+
+		// 一条数据的Map (列名和值的键值对)
+		entry := make(map[string]interface{})
+
+		// Map 赋值，将列名和值对应起来
+		for i, col := range columns {
+			var v interface{}
+
+			val := values[i] // 值复制给val(所以Scan时指定的地址可重复使用)
+			b, ok := val.([]byte)
+			if ok {
+				v = string(b) // 字符切片转为字符串
+			} else {
+				v = val
+			}
+			entry[col] = v
+		}
+
+		// records = append(records, entry)
+		if i > 0 {
+			c.WriteString(",")
+		}
+		b, _ := json.Marshal(entry)
+		c.Write(b)
+		i++
+	}
+	c.WriteString("]")
+	log.Tracef("mysql query rows: %d", i)
+
+	if err = rows.Err(); err != nil {
+		log.Error("Error iterating through rows:", err)
+		return err
+	}
+
+	return nil
+}
+
+// write sql result from json object to fiber response
+func (p *MysqlHandler) sqlHandlerByJson(c fiber.Ctx, sqltext string) error {
 	log.Tracef("mysql sql: %s\n", sqltext)
 	if p.db == nil {
 		if err := p.openDB(); err != nil {

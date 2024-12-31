@@ -37,7 +37,7 @@ func (p *HardwareHandler) AddRouter(r fiber.Router) error {
 	return nil
 }
 
-// GET /hardware/cpu
+// GET /hardware
 func (p *HardwareHandler) hdHandler(c fiber.Ctx) error {
 	c.Context().SetContentType("text/html")
 	c.WriteString(`<html><body><h1>Hardware Information</h1>
