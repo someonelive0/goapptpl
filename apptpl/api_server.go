@@ -63,7 +63,7 @@ func (p *ApiServer) Start() error {
 	redisHdl.AddRouter(app.Group("/redis"))
 
 	// add ClickhouseHandler
-	ckHdl := ClickhouseHandler{Dbconfig: &p.Myconfig.CkConfig}
+	ckHdl := ClickhouseHandler{DbHandler: DbHandler{Dbconfig: &p.Myconfig.CkConfig}}
 	ckHdl.AddRouter(app.Group("/clickhouse"))
 
 	// add PgHandler
