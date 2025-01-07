@@ -33,8 +33,13 @@ func (p *ClickhouseHandler) AddRouter(r fiber.Router) error {
 	r.Get("/tables", p.tablesHandler)
 	r.Get("/table/:table", p.tableHandler)
 	r.Get("/table/:table/columns", p.columnsHandler)
+	r.Get("/table/:table/ddl", p.ddlHandler)
 	// r.Get("/table/:table/indexes", p.indexesHandler)
+	r.Get("/table/:table/ddl", p.ddlHandler)
 	r.Get("/views", p.viewsHandler)
+	r.Get("/view/:table", p.viewHandler)
+	r.Get("/view/:table/columns", p.columnsHandler)
+	r.Get("/view/:table/ddl", p.ddlHandler)
 
 	//解析DSN字符串
 	opt, err := clickhouse.ParseDSN(p.Dbconfig.Dsn[0])
@@ -53,15 +58,9 @@ func (p *ClickhouseHandler) homeHandler(c fiber.Ctx) error {
 	c.Context().SetContentType("text/html")
 	c.WriteString(`<html><body><h1>Clickhouse Information</h1>
 	<a href="/clickhouse/tables?mime=json">tables</a><br>
-	<a href="/clickhouse/table/:table?mime=json">table/:table_name/[columns|indexes|constraints|keys|references|triggers|stats|describe|ddl]</a><br>
+	<a href="/clickhouse/table/:table?mime=json">table/:table_name/[columns|ddl]</a><br>
 	<a href="/clickhouse/views?mime=json">views</a><br>
-	<a href="/clickhouse/view/:view?mime=json">view/:view_name/[columns|indexes|constraints|keys|references|triggers|stats|describe|ddl]</a><br>
-	<a href="/clickhouse/procedures">procedures</a><br>
-	<a href="/clickhouse/procedure/:procedure">procedure/:procedure_name</a><br>
-	<a href="/clickhouse/events">events</a><br>
-	<a href="/clickhouse/event/:event">event/:event_name</a><br>
-	<a href="/clickhouse/triggers">triggers</a><br>
-	<a href="/clickhouse/trigger/:trigger">trigger/:trigger_name</a><br>
+	<a href="/clickhouse/view/:view?mime=json">view/:view_name/[columns|ddl]</a><br>
 	</body></html>`)
 	return nil
 }
@@ -103,61 +102,6 @@ func (p *ClickhouseHandler) tablesHandler(c fiber.Ctx) error {
 	case "excel":
 		filename := p.opt.Auth.Database + "-tables.xlsx"
 		sheetname := p.opt.Auth.Database + " tables"
-		ch := make(chan string, 100)
-		go p.sql2chan(ch, sqltext)
-
-		if err := utils.Json2excel(ch, sheetname, "log/"+filename); err != nil {
-			return err
-		}
-
-		c.Attachment(filename)
-		fp, err := os.Open("log/" + filename)
-		if err != nil {
-			return err
-		}
-		_, err = io.Copy(c, fp)
-		fp.Close()
-		os.Remove("log/" + filename)
-		return err
-
-	default:
-		c.Status(400)
-		c.SendString(fmt.Sprintf("mime '%s' not supported", mime))
-		return nil
-	}
-}
-
-// GET /clickhouse/table/:table/columns?mime=excel|json
-func (p *ClickhouseHandler) columnsHandler(c fiber.Ctx) error {
-	table, _ := url.QueryUnescape(c.Params("table"))
-	sqltext := fmt.Sprintf(`
-	select toJSONString(map(
-		'database', assumeNotNull(database)::String,
-		'table', assumeNotNull(table)::String,
-		'name', assumeNotNull(name)::String,
-		'type', assumeNotNull(type)::String,
-		'position', assumeNotNull(position)::String,
-		'default_kind', assumeNotNull(default_kind)::String,
-		'default_expression', assumeNotNull(default_expression)::String,
-		'compression_codec', assumeNotNull(compression_codec)::String,
-		'numeric_precision', assumeNotNull(numeric_precision)::String,
-		'numeric_precision_radix', assumeNotNull(numeric_precision_radix)::String,
-		'numeric_scale', assumeNotNull(numeric_scale)::String,
-		'datetime_precision', assumeNotNull(datetime_precision)::String,
-		'comment', assumeNotNull(comment)::String
-		)) as json
-	from system.columns
-	where database = '%s' and table = '%s'
-	order by position`, p.opt.Auth.Database, table)
-
-	mime := c.Query("mime", "json") // if Queries params mime is not set, default to json
-	switch mime {
-	case "json":
-		return p.sqlHandlerByJson(c, sqltext)
-
-	case "excel":
-		filename := table + "-columns.xlsx"
-		sheetname := table + " columns"
 		ch := make(chan string, 100)
 		go p.sql2chan(ch, sqltext)
 
@@ -247,12 +191,86 @@ func (p *ClickhouseHandler) tableHandler(c fiber.Ctx) error {
 	}
 }
 
+// GET /clickhouse/table/:table/columns?mime=excel|json
+func (p *ClickhouseHandler) columnsHandler(c fiber.Ctx) error {
+	table, _ := url.QueryUnescape(c.Params("table"))
+	sqltext := fmt.Sprintf(`
+	select toJSONString(map(
+		'database', assumeNotNull(database)::String,
+		'table', assumeNotNull(table)::String,
+		'name', assumeNotNull(name)::String,
+		'type', assumeNotNull(type)::String,
+		'position', assumeNotNull(position)::String,
+		'default_kind', assumeNotNull(default_kind)::String,
+		'default_expression', assumeNotNull(default_expression)::String,
+		'compression_codec', assumeNotNull(compression_codec)::String,
+		'numeric_precision', assumeNotNull(numeric_precision)::String,
+		'numeric_precision_radix', assumeNotNull(numeric_precision_radix)::String,
+		'numeric_scale', assumeNotNull(numeric_scale)::String,
+		'datetime_precision', assumeNotNull(datetime_precision)::String,
+		'comment', assumeNotNull(comment)::String
+		)) as json
+	from system.columns
+	where database = '%s' and table = '%s'
+	order by position`, p.opt.Auth.Database, table)
+
+	mime := c.Query("mime", "json") // if Queries params mime is not set, default to json
+	switch mime {
+	case "json":
+		return p.sqlHandlerByJson(c, sqltext)
+
+	case "excel":
+		filename := table + "-columns.xlsx"
+		sheetname := table + " columns"
+		ch := make(chan string, 100)
+		go p.sql2chan(ch, sqltext)
+
+		if err := utils.Json2excel(ch, sheetname, "log/"+filename); err != nil {
+			return err
+		}
+
+		c.Attachment(filename)
+		fp, err := os.Open("log/" + filename)
+		if err != nil {
+			return err
+		}
+		_, err = io.Copy(c, fp)
+		fp.Close()
+		os.Remove("log/" + filename)
+		return err
+
+	default:
+		c.Status(400)
+		c.SendString(fmt.Sprintf("mime '%s' not supported", mime))
+		return nil
+	}
+}
+
+// GET /clickhouse/table/:table/ddl
+func (p *ClickhouseHandler) ddlHandler(c fiber.Ctx) error {
+	table, _ := url.QueryUnescape(c.Params("table"))
+	sqltext := fmt.Sprintf(`show create %s`, table)
+
+	return p.sqlHandler2Json(c, sqltext)
+}
+
 // GET /clickhouse/views?mime=excel|json
 func (p *ClickhouseHandler) viewsHandler(c fiber.Ctx) error {
 	sqltext := fmt.Sprintf(`
 		select * from information_schema.views 
 		where table_catalog = '%s'
 		`, p.opt.Auth.Database)
+
+	return p.sqlHandler2Json(c, sqltext)
+}
+
+// GET /clickhouse/view/:table
+func (p *ClickhouseHandler) viewHandler(c fiber.Ctx) error {
+	table, _ := url.QueryUnescape(c.Params("table"))
+	sqltext := fmt.Sprintf(`
+		select * from information_schema.views 
+		where table_catalog = '%s' and table_name = '%s'
+		`, p.opt.Auth.Database, table)
 
 	return p.sqlHandler2Json(c, sqltext)
 }
