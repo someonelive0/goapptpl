@@ -51,7 +51,7 @@ func (p *ApiServer) Start() error {
 	p.initRoute(app)
 
 	// add MysqlHandler
-	mysqlHdl := MysqlHandler{Dbconfig: &p.Myconfig.MysqlConfig, Mycache: p.mycache}
+	mysqlHdl := MysqlHandler{DbHandler: DbHandler{Dbconfig: &p.Myconfig.MysqlConfig, Mycache: p.mycache}}
 	mysqlHdl.AddRouter(app.Group("/mysql"))
 
 	// add MinioHandler
@@ -63,11 +63,11 @@ func (p *ApiServer) Start() error {
 	redisHdl.AddRouter(app.Group("/redis"))
 
 	// add ClickhouseHandler
-	ckHdl := ClickhouseHandler{DbHandler: DbHandler{Dbconfig: &p.Myconfig.CkConfig}}
+	ckHdl := ClickhouseHandler{DbHandler: DbHandler{Dbconfig: &p.Myconfig.CkConfig, Mycache: p.mycache}}
 	ckHdl.AddRouter(app.Group("/clickhouse"))
 
 	// add PgHandler
-	pgHdl := PgHandler{Dbconfig: &p.Myconfig.PgConfig}
+	pgHdl := PgHandler{DbHandler: DbHandler{Dbconfig: &p.Myconfig.PgConfig, Mycache: p.mycache}}
 	pgHdl.AddRouter(app.Group("/postgresql"))
 
 	// add HardwareHandler
