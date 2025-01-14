@@ -62,6 +62,8 @@ func InitLogRotate(logpath, logfile, level string,
 				return err
 			}
 		}
+	} else {
+		logpath = "."
 	}
 
 	// set log file how to rotate
@@ -76,7 +78,7 @@ func InitLogRotate(logpath, logfile, level string,
 		rotate_mbytes = MAX_ROTATE_MBYTES
 	}
 	logf, err := rotatelogs.New(
-		"log/"+logfile+".%Y%m%d",
+		logpath+"/"+logfile+".%Y%m%d",
 		//rotatelogs.WithLinkName(prgname),
 		//rotatelogs.WithMaxAge(-1),
 		//rotatelogs.WithRotationCount(10),
