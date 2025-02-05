@@ -52,10 +52,31 @@ func testdoc1() {
 
 }
 
+// 测试中文问答
 func testdoc2() {
 	ctx := context.Background()
+	embeddingFunc := chromem.NewEmbeddingFuncOllama(
+		"tazarov/all-minilm-l6-v2-f32",
+		"http://192.168.30.59:11434/api")
 
-	db := chromem.NewDB()
+	// db := chromem.NewDB()
+	db, err := chromem.NewPersistentDB("ragapp/db", false)
+	if err != nil {
+		panic(err)
+	}
+	collections := db.ListCollections()
+	fmt.Printf("collections: %#v\n", collections)
+	knowledge := db.GetCollection("knowledge-base", embeddingFunc)
+	fmt.Printf("knowledge-base count: %d\n", knowledge.Count())
+	knowledge.Query(ctx, "天空是蓝色的原因是什么？", 1, nil, nil)
+	res, err := knowledge.Query(ctx, "为什么天空是蓝色的？", 1, nil, nil)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("ID: %v\n相似度: %v\n内容: %v\n", res[0].ID, res[0].Similarity, res[0].Content)
+
+	fmt.Println("使用新建collection")
+
 	/*
 		使用Ollama模型进行嵌入，类似命令
 		curl http://localhost:11434/api/embeddings -d '{
@@ -63,9 +84,6 @@ func testdoc2() {
 		  "prompt": "Llamas are members of the camelid family"
 		}'
 	*/
-	embeddingFunc := chromem.NewEmbeddingFuncOllama(
-		"tazarov/all-minilm-l6-v2-f32",
-		"http://192.168.30.59:11434/api")
 
 	c, err := db.CreateCollection("knowledge-base", nil, embeddingFunc)
 	if err != nil {
@@ -86,7 +104,7 @@ func testdoc2() {
 		panic(err)
 	}
 
-	res, err := c.Query(ctx, "为什么天空是蓝色的？", 1, nil, nil)
+	res, err = c.Query(ctx, "为什么天空是蓝色的？", 1, nil, nil)
 	if err != nil {
 		panic(err)
 	}
