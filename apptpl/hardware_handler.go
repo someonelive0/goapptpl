@@ -19,7 +19,7 @@ type HardwareHandler struct {
 
 // r := app.Group("/hardware")
 func (p *HardwareHandler) AddRouter(r fiber.Router) error {
-	log.Info("MysqlHandler AddRouter")
+	log.Info("HardwareHandler AddRouter")
 
 	r.Get("", p.hdHandler)
 	r.Get("/", p.hdHandler)
@@ -37,10 +37,10 @@ func (p *HardwareHandler) AddRouter(r fiber.Router) error {
 	return nil
 }
 
-// GET /hardware/cpu
+// GET /hardware
 func (p *HardwareHandler) hdHandler(c fiber.Ctx) error {
-	c.Context().SetContentType("text/html")
-	c.WriteString(`<html><body><h1>Hardware</h1>
+	c.Response().Header.Set("Content-Type", "text/html")
+	c.WriteString(`<html><body><h1>Hardware Information</h1>
 	<a href="/hardware/cpu">cpu</a><br>
 	<a href="/hardware/mem">mem</a><br>
 	<a href="/hardware/block">block</a><br>
@@ -58,7 +58,7 @@ func (p *HardwareHandler) hdHandler(c fiber.Ctx) error {
 // GET /hardware/cpu
 func (p *HardwareHandler) cpuHandler(c fiber.Ctx) error {
 	if b, found := p.Mycache.Get(c.Path()); found {
-		c.Context().SetContentType("application/json")
+		c.Response().Header.Set("Content-Type", "application/json")
 		c.Write(b.([]byte))
 		return nil
 	}
@@ -70,7 +70,7 @@ func (p *HardwareHandler) cpuHandler(c fiber.Ctx) error {
 	}
 	// c.WriteString(fmt.Sprintf("cpu %#v\n", cpu))
 
-	c.Context().SetContentType("application/json")
+	c.Response().Header.Set("Content-Type", "application/json")
 	b, _ := json.Marshal(cpu)
 	c.Write(b)
 
@@ -114,7 +114,7 @@ func (p *HardwareHandler) memHandler(c fiber.Ctx) error {
 
 	c.WriteString(fmt.Sprintf(`{ "memo": "%s", `, memory.String()))
 
-	c.Context().SetContentType("application/json")
+	c.Response().Header.Set("Content-Type", "application/json")
 	b, _ := json.Marshal(memory)
 	c.Write(b[1:])
 
@@ -129,7 +129,7 @@ func (p *HardwareHandler) blockHandler(c fiber.Ctx) error {
 		return utils.MkError(500, fmt.Sprintf("Error getting storage info: %v", err))
 	}
 
-	c.Context().SetContentType("application/json")
+	c.Response().Header.Set("Content-Type", "application/json")
 	b, _ := json.Marshal(block)
 	c.Write(b)
 
@@ -151,7 +151,7 @@ func (p *HardwareHandler) networkHandler(c fiber.Ctx) error {
 		return utils.MkError(500, fmt.Sprintf("Error getting network info: %v", err))
 	}
 
-	c.Context().SetContentType("application/json")
+	c.Response().Header.Set("Content-Type", "application/json")
 	b, _ := json.Marshal(net.NICs)
 	c.Write(b)
 
@@ -183,7 +183,7 @@ func (p *HardwareHandler) pciHandler(c fiber.Ctx) error {
 		return utils.MkError(500, fmt.Sprintf("Error getting PCI info: %v", err))
 	}
 
-	c.Context().SetContentType("application/json")
+	c.Response().Header.Set("Content-Type", "application/json")
 	b, _ := json.Marshal(pci.Devices)
 	c.Write(b)
 
@@ -212,7 +212,7 @@ func (p *HardwareHandler) gpuHandler(c fiber.Ctx) error {
 		return utils.MkError(500, fmt.Sprintf("Error getting GPU info: %v", err))
 	}
 
-	c.Context().SetContentType("application/json")
+	c.Response().Header.Set("Content-Type", "application/json")
 	b, _ := json.Marshal(gpu.GraphicsCards)
 	c.Write(b)
 
@@ -231,7 +231,7 @@ func (p *HardwareHandler) chassisHandler(c fiber.Ctx) error {
 		return utils.MkError(500, fmt.Sprintf("Error getting chassis info: %v", err))
 	}
 
-	c.Context().SetContentType("application/json")
+	c.Response().Header.Set("Content-Type", "application/json")
 	b, _ := json.Marshal(chassis)
 	c.Write(b)
 
@@ -246,7 +246,7 @@ func (p *HardwareHandler) biosHandler(c fiber.Ctx) error {
 		return utils.MkError(500, fmt.Sprintf("Error getting BIOS info: %v", err))
 	}
 
-	c.Context().SetContentType("application/json")
+	c.Response().Header.Set("Content-Type", "application/json")
 	b, _ := json.Marshal(bios)
 	c.Write(b)
 
@@ -261,7 +261,7 @@ func (p *HardwareHandler) baseboardHandler(c fiber.Ctx) error {
 		return utils.MkError(500, fmt.Sprintf("Error getting baseboard info: %v", err))
 	}
 
-	c.Context().SetContentType("application/json")
+	c.Response().Header.Set("Content-Type", "application/json")
 	b, _ := json.Marshal(baseboard)
 	c.Write(b)
 
@@ -276,7 +276,7 @@ func (p *HardwareHandler) productHandler(c fiber.Ctx) error {
 		return utils.MkError(500, fmt.Sprintf("Error getting product info: %v", err))
 	}
 
-	c.Context().SetContentType("application/json")
+	c.Response().Header.Set("Content-Type", "application/json")
 	b, _ := json.Marshal(product)
 	c.Write(b)
 

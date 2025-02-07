@@ -27,6 +27,7 @@ type ApiServer struct {
 	ckHdl       *ClickhouseHandler
 	pgHdl       *PgHandler
 	hardwareHdl *HardwareHandler
+	hostHdl     *HostHandler
 
 	mycache *cache.Cache
 }
@@ -50,7 +51,7 @@ func (p *ApiServer) Start() error {
 	p.initRoute(app)
 
 	// add MysqlHandler
-	mysqlHdl := MysqlHandler{Dbconfig: &p.Myconfig.MysqlConfig, Mycache: p.mycache}
+	mysqlHdl := MysqlHandler{DbHandler: DbHandler{Dbconfig: &p.Myconfig.MysqlConfig, Mycache: p.mycache}}
 	mysqlHdl.AddRouter(app.Group("/mysql"))
 
 	// add MinioHandler
@@ -62,16 +63,20 @@ func (p *ApiServer) Start() error {
 	redisHdl.AddRouter(app.Group("/redis"))
 
 	// add ClickhouseHandler
-	ckHdl := ClickhouseHandler{Dbconfig: &p.Myconfig.CkConfig}
+	ckHdl := ClickhouseHandler{DbHandler: DbHandler{Dbconfig: &p.Myconfig.CkConfig, Mycache: p.mycache}}
 	ckHdl.AddRouter(app.Group("/clickhouse"))
 
 	// add PgHandler
-	pgHdl := PgHandler{Dbconfig: &p.Myconfig.PgConfig}
+	pgHdl := PgHandler{DbHandler: DbHandler{Dbconfig: &p.Myconfig.PgConfig, Mycache: p.mycache}}
 	pgHdl.AddRouter(app.Group("/postgresql"))
 
 	// add HardwareHandler
 	hardwareHdl := HardwareHandler{Mycache: p.mycache}
 	hardwareHdl.AddRouter(app.Group("/hardware"))
+
+	// add HostHandler
+	hostHdl := HostHandler{Mycache: p.mycache}
+	hostHdl.AddRouter(app.Group("/host"))
 
 	// data, _ := json.MarshalIndent(app.Stack(), "", "  ")
 	// log.Debug(string(data))
@@ -85,6 +90,7 @@ func (p *ApiServer) Start() error {
 	p.ckHdl = &ckHdl
 	p.pgHdl = &pgHdl
 	p.hardwareHdl = &hardwareHdl
+	p.hostHdl = &hostHdl
 
 	// use CertFile and CertKeyFile to listen https
 	// 正常时阻塞在这里
@@ -300,7 +306,8 @@ func (p *ApiServer) ticketHandler(c fiber.Ctx) error {
 			"tenant": ""
 		}
 	}`
-	c.Context().SetContentType("application/json")
+	c.Response().Header.Set("Content-Type", "application/json")
+	// c.Context().SetContentType("application/json")
 	c.WriteString(resp)
 
 	return nil
@@ -357,7 +364,7 @@ func (p *ApiServer) aiAnalyzeriskHandler(c fiber.Ctx) error {
 		return err
 	}
 
-	c.Context().SetContentType("application/json")
+	c.Response().Header.Set("Content-Type", "application/json")
 	c.WriteString(resp)
 
 	return nil
@@ -413,7 +420,7 @@ func (p *ApiServer) aiDataidentifyHandler(c fiber.Ctx) error {
 		return err
 	}
 
-	c.Context().SetContentType("application/json")
+	c.Response().Header.Set("Content-Type", "application/json")
 	c.WriteString(resp)
 
 	return nil

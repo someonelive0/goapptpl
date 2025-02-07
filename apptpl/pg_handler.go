@@ -1,14 +1,11 @@
 package main
 
 import (
-	"context"
-	"database/sql"
 	"fmt"
 	"io"
 	"net/url"
 	"os"
 	"strconv"
-	"time"
 
 	"github.com/gofiber/fiber/v3"
 	_ "github.com/lib/pq"
@@ -22,19 +19,24 @@ const (
 )
 
 type PgHandler struct {
-	Dbconfig *DBConfig
-	db       *sql.DB  // pg dbpool
-	u        *url.URL // pg url of dsn
+	DbHandler
+	u *url.URL // pg url of dsn
 }
 
 // r := app.Group("/postgresql")
 func (p *PgHandler) AddRouter(r fiber.Router) error {
 	log.Info("PgHandler AddRouter")
 
+	r.Get("", p.homeHandler)
+	r.Get("/", p.homeHandler)
 	r.Get("/tables", p.tablesHandler)
+	r.Get("/table/:table", p.tableHandler)
 	r.Get("/table/:table/columns", p.columnsHandler)
 	r.Get("/table/:table/indexes", p.indexesHandler)
-	r.Get("/table/:table", p.tableHandler)
+	r.Get("/views", p.viewsHandler)
+	r.Get("/view/:table", p.viewHandler)
+	r.Get("/procedures", p.proceduresHandler)
+	r.Get("/procedure/:procedure", p.procedureHandler)
 
 	//解析DSN字符串
 	u, err := url.Parse(p.Dbconfig.Dsn[0])
@@ -45,6 +47,24 @@ func (p *PgHandler) AddRouter(r fiber.Router) error {
 	p.u = u
 	log.Debugf("postgresql url: %#v", u)
 
+	return nil
+}
+
+// GET /postgresql
+func (p *PgHandler) homeHandler(c fiber.Ctx) error {
+	c.Response().Header.Set("Content-Type", "text/html")
+	c.WriteString(`<html><body><h1>Postgresql Information</h1>
+	<a href="/postgresql/tables?mime=json">tables</a><br>
+	<a href="/postgresql/table/:table?mime=json">table/:table_name/[columns|indexes|constraints|keys|references|triggers|stats|describe|ddl]</a><br>
+	<a href="/postgresql/views?mime=json">views</a><br>
+	<a href="/postgresql/view/:view?mime=json">view/:view_name/[columns|indexes|constraints|keys|references|triggers|stats|describe|ddl]</a><br>
+	<a href="/postgresql/procedures">procedures</a><br>
+	<a href="/postgresql/procedure/:procedure">procedure/:procedure_name</a><br>
+	<a href="/postgresql/events">events</a><br>
+	<a href="/postgresql/event/:event">event/:event_name</a><br>
+	<a href="/postgresql/triggers">triggers</a><br>
+	<a href="/postgresql/trigger/:trigger">trigger/:trigger_name</a><br>
+	</body></html>`)
 	return nil
 }
 
@@ -73,7 +93,7 @@ order by tab.schemaname, tab.tablename`
 	mime := c.Query("mime", "json") // if Queries params mime is not set, default to json
 	switch mime {
 	case "json":
-		return p.sqlHandler(c, sqltext)
+		return p.sqlHandlerByJson(c, sqltext)
 
 	case "excel":
 		filename := p.u.Path + "-tables.xlsx"
@@ -126,7 +146,7 @@ func (p *PgHandler) columnsHandler(c fiber.Ctx) error {
 	mime := c.Query("mime", "json") // if Queries params mime is not set, default to json
 	switch mime {
 	case "json":
-		return p.sqlHandler(c, sqltext)
+		return p.sqlHandlerByJson(c, sqltext)
 
 	case "excel":
 		filename := table + "-columns.xlsx"
@@ -187,7 +207,7 @@ where
 	mime := c.Query("mime", "json") // if Queries params mime is not set, default to json
 	switch mime {
 	case "json":
-		return p.sqlHandler(c, sqltext)
+		return p.sqlHandlerByJson(c, sqltext)
 
 	case "excel":
 		filename := table + "-indexs.xlsx"
@@ -231,7 +251,7 @@ func (p *PgHandler) tableHandler(c fiber.Ctx) error {
 	switch mime {
 	case "json":
 		// TODO 当表数据行数很大时，会占用很大内存，应该改为流式处理
-		return p.sqlHandler(c, sqltext)
+		return p.sqlHandlerByJson(c, sqltext)
 
 	case "excel":
 		filename := table + ".xlsx"
@@ -261,163 +281,125 @@ func (p *PgHandler) tableHandler(c fiber.Ctx) error {
 	}
 }
 
-// write sql result to fiber response
-func (p *PgHandler) sqlHandler(c fiber.Ctx, sqltext string) error {
-	log.Tracef("postgresql sql: %s\n", sqltext)
-	if p.db == nil {
-		if err := p.openDB(); err != nil {
+// GET /postgresql/views?mime=excel|json
+func (p *PgHandler) viewsHandler(c fiber.Ctx) error {
+	sqltext := `select 
+		json_build_object(
+			'schemaname', viw.schemaname,
+			'viewname', viw.viewname,
+			'oid', cla."oid",
+			'viewowner', viw.viewowner,
+			'reltablespace', cla.reltablespace,
+			'reltype', cla.reltype,
+			'definition', viw.definition,
+			'relhasindex', cla.relhasindex,
+			'relhasindex', cla.relhasindex,
+			'relhastriggers', cla.relhastriggers,
+			'relrowsecurity', cla.relrowsecurity,
+			'rows', stat.n_live_tup,
+			'description', des.description
+		) as json
+	from pg_views viw
+	left join pg_class cla on viw.viewname = cla.relname
+	left join pg_description des on	des.objoid = cla.oid and objsubid = 0  --为0就是表的描述，其他是字段的描述
+	left join pg_stat_user_tables stat on viw.viewname = stat.relname 
+	order by viw.schemaname, viw.viewname`
+
+	mime := c.Query("mime", "json") // if Queries params mime is not set, default to json
+	switch mime {
+	case "json":
+		return p.sqlHandlerByJson(c, sqltext)
+
+	case "excel":
+		filename := p.u.Path + "-tables.xlsx"
+		sheetname := p.u.Path + " tables"
+		ch := make(chan string, 100)
+		go p.sql2chan(ch, sqltext)
+
+		if err := utils.Json2excel(ch, sheetname, "log/"+filename); err != nil {
 			return err
 		}
-	}
 
-	rows, err := p.db.Query(sqltext)
-	if err != nil {
-		log.Error("Error executing query:", err)
-		c.WriteString(err.Error())
-		return err
-	}
-	defer rows.Close()
-
-	c.Context().SetContentType("application/json")
-
-	c.WriteString("[")
-	i := 0
-	for rows.Next() {
-		var jsonstr string
-		err = rows.Scan(&jsonstr)
+		c.Attachment(filename)
+		fp, err := os.Open("log/" + filename)
 		if err != nil {
-			log.Error("Error scanning row:", err)
-			continue
-		}
-		if i > 0 {
-			c.WriteString(",")
-		}
-		c.WriteString(jsonstr)
-		i++
-	}
-	c.WriteString("]")
-	log.Tracef("pg query rows: %d", i)
-
-	if err = rows.Err(); err != nil {
-		log.Error("Error iterating through rows:", err)
-		return err
-	}
-
-	return nil
-}
-
-// write sql result to channel
-func (p *PgHandler) sql2chan(ch chan string, sqltext string) error {
-	log.Tracef("/postgresql sql: %s\n", sqltext)
-	if p.db == nil {
-		if err := p.openDB(); err != nil {
 			return err
 		}
-	}
-
-	rows, err := p.db.Query(sqltext)
-	if err != nil {
-		log.Error("Error executing query:", err)
+		_, err = io.Copy(c, fp)
+		fp.Close()
+		os.Remove("log/" + filename)
 		return err
-	}
-	defer rows.Close()
 
-	for rows.Next() {
-		var jsonstr string
-		err = rows.Scan(&jsonstr)
-		if err != nil {
-			log.Error("Error scanning row:", err)
-			continue
+	default:
+		c.Status(400)
+		c.SendString(fmt.Sprintf("mime '%s' not supported", mime))
+		return nil
+	}
+}
+
+// GET /postgresql/view/:table?limit=10000&mime=excel|json
+func (p *PgHandler) viewHandler(c fiber.Ctx) error {
+	table, _ := url.QueryUnescape(c.Params("table"))
+	// TODO 当数据行数很大时，会占用很大内存，应该改为流式处理，这里限制最多10000行
+	limit := c.Query("limit", "100")
+	if i, err := strconv.Atoi(limit); err != nil || i > 10000 {
+		limit = "100"
+	}
+
+	sqltext := fmt.Sprintf(`select * from %s limit %s`, table, limit)
+
+	mime := c.Query("mime", "json") // if Queries params mime is not set, default to json
+	switch mime {
+	case "json":
+		// TODO 当表数据行数很大时，会占用很大内存，应该改为流式处理
+		return p.sqlHandler2Json(c, sqltext)
+
+	case "excel":
+		filename := table + ".xlsx"
+		sheetname := table
+		ch := make(chan string, 100)
+		go p.sql2chan(ch, sqltext)
+
+		if err := utils.Json2excel(ch,
+			sheetname, "log/"+filename); err != nil {
+			return err
 		}
-		ch <- jsonstr
-	}
 
-	if err = rows.Err(); err != nil {
-		log.Error("Error iterating through rows:", err)
+		c.Attachment(filename)
+		fp, err := os.Open("log/" + filename)
+		if err != nil {
+			return err
+		}
+		_, err = io.Copy(c, fp)
+		fp.Close()
+		os.Remove("log/" + filename)
 		return err
-	}
 
-	close(ch)
-	return nil
+	default:
+		c.Status(400)
+		c.SendString(fmt.Sprintf("mime '%s' not supported", mime))
+		return nil
+	}
 }
 
-// get columns of table to string with ',' split. sort by ordinal_position
-// func (p *PgHandler) getColumns(table string) ([]string, error) {
-// 	if p.db == nil {
-// 		if err := p.openDB(); err != nil {
-// 			return nil, err
-// 		}
-// 	}
-
-// 	sqltext := fmt.Sprintf(`select column_name
-// 	from information_schema.columns
-// 	where table_name='%s'
-// 	order by ordinal_position `, table)
-// 	rows, err := p.db.Query(sqltext)
-// 	if err != nil {
-// 		log.Error("Error executing query:", err)
-// 		return nil, err
-// 	}
-// 	defer rows.Close()
-
-// 	var columns []string = make([]string, 0)
-// 	var column string
-// 	for rows.Next() {
-// 		err = rows.Scan(&column)
-// 		if err != nil {
-// 			log.Error("Error scanning row:", err)
-// 			continue
-// 		}
-// 		columns = append(columns, column)
-// 	}
-
-// 	if err = rows.Err(); err != nil {
-// 		log.Error("Error iterating through rows:", err)
-// 		return nil, err
-// 	}
-
-// 	return columns, nil
-// }
-
-func (p *PgHandler) openDB() error {
-	//将空闲时间字符串解析为time.Duration类型
-	MaxIdleDuration, err := time.ParseDuration(p.Dbconfig.MaxIdleTime)
-	if err != nil {
-		return fmt.Errorf("parse dbconfig.maxidletime [%s] failed: %s", p.Dbconfig.MaxIdleTime, err)
-	}
-
-	//打开数据库连接
-	db, err := sql.Open(p.Dbconfig.Dbtype, p.Dbconfig.Dsn[0])
-	if err != nil {
-		log.Error("open database failed:", err)
-		return err
-	}
-
-	//设置最大开放连接数，注意该值为小于0或等于0指的是无限制连接数
-	db.SetMaxOpenConns(p.Dbconfig.MaxOpenConns)
-
-	//设置空闲连接数，将此值设置为小于或等于0将意味着不保留空闲连接，即立即关闭连接
-	db.SetMaxIdleConns(p.Dbconfig.MaxIdleConns)
-
-	//设置最大空闲超时
-	db.SetConnMaxIdleTime(MaxIdleDuration)
-	ctx, cancel := context.WithTimeout(context.Background(), PG_MAX_TIMEOUT*time.Second)
-	defer cancel()
-
-	err = db.PingContext(ctx)
-	if err != nil {
-		log.Errorf("ping postgresql [%s] failed: %s", p.Dbconfig.Dsn[0], err)
-		return err
-	}
-
-	log.Infof("ping postgresql [%s:%s] success", p.u.Host, p.u.Port())
-	p.db = db
-	return nil
+// GET /mysql/procedures
+func (p *PgHandler) proceduresHandler(c fiber.Ctx) error {
+	sqltext := `select 
+		routine_catalog,
+		routine_schema,
+		routine_name,
+		routine_type,
+		routine_body,
+		routine_definition,
+		parameter_style,
+		data_type
+	from information_schema.routines`
+	return p.sqlHandler2Json(c, sqltext)
 }
 
-func (p *PgHandler) Close() error {
-	if p.db != nil {
-		return p.db.Close()
-	}
-	return nil
+// GET /mysql/procedure/:procedure
+func (p *PgHandler) procedureHandler(c fiber.Ctx) error {
+	procedure, _ := url.QueryUnescape(c.Params("procedure"))
+	sqltext := fmt.Sprintf(`select * from pg_proc where proname = '%s'`, procedure)
+	return p.sqlHandler2Json(c, sqltext)
 }

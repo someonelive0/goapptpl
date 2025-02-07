@@ -1,15 +1,12 @@
 package main
 
 import (
-	"context"
-	"database/sql"
 	"fmt"
 	"io"
 	"net/url"
 	"os"
 	"strconv"
 	"strings"
-	"time"
 
 	clickhouse "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/gofiber/fiber/v3"
@@ -23,19 +20,26 @@ const (
 )
 
 type ClickhouseHandler struct {
-	Dbconfig *DBConfig
-	db       *sql.DB             // clickhouse dbpool
-	opt      *clickhouse.Options // clickhouse config of dsn
+	DbHandler
+	opt *clickhouse.Options // clickhouse config of dsn
 }
 
 // r := app.Group("/clickhouse")
 func (p *ClickhouseHandler) AddRouter(r fiber.Router) error {
 	log.Info("ClickhouseHandler AddRouter")
 
+	r.Get("", p.homeHandler)
+	r.Get("/", p.homeHandler)
 	r.Get("/tables", p.tablesHandler)
-	r.Get("/table/:table/columns", p.columnsHandler)
-	// r.Get("/table/:table/indexes", p.indexesHandler)
 	r.Get("/table/:table", p.tableHandler)
+	r.Get("/table/:table/columns", p.columnsHandler)
+	r.Get("/table/:table/ddl", p.ddlHandler)
+	// r.Get("/table/:table/indexes", p.indexesHandler)
+	r.Get("/table/:table/ddl", p.ddlHandler)
+	r.Get("/views", p.viewsHandler)
+	r.Get("/view/:table", p.viewHandler)
+	r.Get("/view/:table/columns", p.columnsHandler)
+	r.Get("/view/:table/ddl", p.ddlHandler)
 
 	//解析DSN字符串
 	opt, err := clickhouse.ParseDSN(p.Dbconfig.Dsn[0])
@@ -46,6 +50,18 @@ func (p *ClickhouseHandler) AddRouter(r fiber.Router) error {
 	p.opt = opt
 	// log.Debugf("clickhouse options: %#v", opt)
 
+	return nil
+}
+
+// GET /clickhouse
+func (p *ClickhouseHandler) homeHandler(c fiber.Ctx) error {
+	c.Response().Header.Set("Content-Type", "text/html")
+	c.WriteString(`<html><body><h1>Clickhouse Information</h1>
+	<a href="/clickhouse/tables?mime=json">tables</a><br>
+	<a href="/clickhouse/table/:table?mime=json">table/:table_name/[columns|ddl]</a><br>
+	<a href="/clickhouse/views?mime=json">views</a><br>
+	<a href="/clickhouse/view/:view?mime=json">view/:view_name/[columns|ddl]</a><br>
+	</body></html>`)
 	return nil
 }
 
@@ -81,66 +97,11 @@ func (p *ClickhouseHandler) tablesHandler(c fiber.Ctx) error {
 	mime := c.Query("mime", "json") // if Queries params mime is not set, default to json
 	switch mime {
 	case "json":
-		return p.sqlHandler(c, sqltext)
+		return p.sqlHandlerByJson(c, sqltext)
 
 	case "excel":
 		filename := p.opt.Auth.Database + "-tables.xlsx"
 		sheetname := p.opt.Auth.Database + " tables"
-		ch := make(chan string, 100)
-		go p.sql2chan(ch, sqltext)
-
-		if err := utils.Json2excel(ch, sheetname, "log/"+filename); err != nil {
-			return err
-		}
-
-		c.Attachment(filename)
-		fp, err := os.Open("log/" + filename)
-		if err != nil {
-			return err
-		}
-		_, err = io.Copy(c, fp)
-		fp.Close()
-		os.Remove("log/" + filename)
-		return err
-
-	default:
-		c.Status(400)
-		c.SendString(fmt.Sprintf("mime '%s' not supported", mime))
-		return nil
-	}
-}
-
-// GET /clickhouse/table/:table/columns?mime=excel|json
-func (p *ClickhouseHandler) columnsHandler(c fiber.Ctx) error {
-	table, _ := url.QueryUnescape(c.Params("table"))
-	sqltext := fmt.Sprintf(`
-	select toJSONString(map(
-		'database', assumeNotNull(database)::String,
-		'table', assumeNotNull(table)::String,
-		'name', assumeNotNull(name)::String,
-		'type', assumeNotNull(type)::String,
-		'position', assumeNotNull(position)::String,
-		'default_kind', assumeNotNull(default_kind)::String,
-		'default_expression', assumeNotNull(default_expression)::String,
-		'compression_codec', assumeNotNull(compression_codec)::String,
-		'numeric_precision', assumeNotNull(numeric_precision)::String,
-		'numeric_precision_radix', assumeNotNull(numeric_precision_radix)::String,
-		'numeric_scale', assumeNotNull(numeric_scale)::String,
-		'datetime_precision', assumeNotNull(datetime_precision)::String,
-		'comment', assumeNotNull(comment)::String
-		)) as json
-	from system.columns
-	where database = '%s' and table = '%s'
-	order by position`, p.opt.Auth.Database, table)
-
-	mime := c.Query("mime", "json") // if Queries params mime is not set, default to json
-	switch mime {
-	case "json":
-		return p.sqlHandler(c, sqltext)
-
-	case "excel":
-		filename := table + "-columns.xlsx"
-		sheetname := table + " columns"
 		ch := make(chan string, 100)
 		go p.sql2chan(ch, sqltext)
 
@@ -200,7 +161,7 @@ func (p *ClickhouseHandler) tableHandler(c fiber.Ctx) error {
 	switch mime {
 	case "json":
 		// TODO 当表数据行数很大时，会占用很大内存，应该改为流式处理
-		return p.sqlHandler(c, sqltext)
+		return p.sqlHandlerByJson(c, sqltext)
 
 	case "excel":
 		filename := table + ".xlsx"
@@ -230,84 +191,88 @@ func (p *ClickhouseHandler) tableHandler(c fiber.Ctx) error {
 	}
 }
 
-// write sql result to fiber response
-func (p *ClickhouseHandler) sqlHandler(c fiber.Ctx, sqltext string) error {
-	log.Tracef("clickhouse sql: %s\n", sqltext)
-	if p.db == nil {
-		if err := p.openDB(); err != nil {
+// GET /clickhouse/table/:table/columns?mime=excel|json
+func (p *ClickhouseHandler) columnsHandler(c fiber.Ctx) error {
+	table, _ := url.QueryUnescape(c.Params("table"))
+	sqltext := fmt.Sprintf(`
+	select toJSONString(map(
+		'database', assumeNotNull(database)::String,
+		'table', assumeNotNull(table)::String,
+		'name', assumeNotNull(name)::String,
+		'type', assumeNotNull(type)::String,
+		'position', assumeNotNull(position)::String,
+		'default_kind', assumeNotNull(default_kind)::String,
+		'default_expression', assumeNotNull(default_expression)::String,
+		'compression_codec', assumeNotNull(compression_codec)::String,
+		'numeric_precision', assumeNotNull(numeric_precision)::String,
+		'numeric_precision_radix', assumeNotNull(numeric_precision_radix)::String,
+		'numeric_scale', assumeNotNull(numeric_scale)::String,
+		'datetime_precision', assumeNotNull(datetime_precision)::String,
+		'comment', assumeNotNull(comment)::String
+		)) as json
+	from system.columns
+	where database = '%s' and table = '%s'
+	order by position`, p.opt.Auth.Database, table)
+
+	mime := c.Query("mime", "json") // if Queries params mime is not set, default to json
+	switch mime {
+	case "json":
+		return p.sqlHandlerByJson(c, sqltext)
+
+	case "excel":
+		filename := table + "-columns.xlsx"
+		sheetname := table + " columns"
+		ch := make(chan string, 100)
+		go p.sql2chan(ch, sqltext)
+
+		if err := utils.Json2excel(ch, sheetname, "log/"+filename); err != nil {
 			return err
 		}
-	}
 
-	rows, err := p.db.Query(sqltext)
-	if err != nil {
-		log.Error("Error executing query:", err)
-		c.WriteString(err.Error())
-		return err
-	}
-	defer rows.Close()
-
-	c.Context().SetContentType("application/json")
-
-	c.WriteString("[")
-	i := 0
-	for rows.Next() {
-		var jsonstr string
-		err = rows.Scan(&jsonstr)
+		c.Attachment(filename)
+		fp, err := os.Open("log/" + filename)
 		if err != nil {
-			log.Error("Error scanning row:", err)
-			continue
+			return err
 		}
-		if i > 0 {
-			c.WriteString(",")
-		}
-		c.WriteString(jsonstr)
-		i++
-	}
-	c.WriteString("]")
-	log.Tracef("clickhouse query rows: %d", i)
-
-	if err = rows.Err(); err != nil {
-		log.Error("Error iterating through rows:", err)
+		_, err = io.Copy(c, fp)
+		fp.Close()
+		os.Remove("log/" + filename)
 		return err
-	}
 
-	return nil
+	default:
+		c.Status(400)
+		c.SendString(fmt.Sprintf("mime '%s' not supported", mime))
+		return nil
+	}
 }
 
-// write sql result to channel
-func (p *ClickhouseHandler) sql2chan(ch chan string, sqltext string) error {
-	log.Tracef("/clickhouse sql: %s\n", sqltext)
-	if p.db == nil {
-		if err := p.openDB(); err != nil {
-			return err
-		}
-	}
+// GET /clickhouse/table/:table/ddl
+func (p *ClickhouseHandler) ddlHandler(c fiber.Ctx) error {
+	table, _ := url.QueryUnescape(c.Params("table"))
+	sqltext := fmt.Sprintf(`show create %s`, table)
 
-	rows, err := p.db.Query(sqltext)
-	if err != nil {
-		log.Error("Error executing query:", err)
-		return err
-	}
-	defer rows.Close()
+	return p.sqlHandler2Json(c, sqltext)
+}
 
-	for rows.Next() {
-		var jsonstr string
-		err = rows.Scan(&jsonstr)
-		if err != nil {
-			log.Error("Error scanning row:", err)
-			continue
-		}
-		ch <- jsonstr
-	}
+// GET /clickhouse/views?mime=excel|json
+func (p *ClickhouseHandler) viewsHandler(c fiber.Ctx) error {
+	sqltext := fmt.Sprintf(`
+		select * from information_schema.views 
+		where table_catalog = '%s'
+		`, p.opt.Auth.Database)
 
-	if err = rows.Err(); err != nil {
-		log.Error("Error iterating through rows:", err)
-		return err
-	}
+	return p.sqlHandler2Json(c, sqltext)
+}
 
-	close(ch)
-	return nil
+// GET /clickhouse/view/:table
+func (p *ClickhouseHandler) viewHandler(c fiber.Ctx) error {
+	table, _ := url.QueryUnescape(c.Params("table"))
+	sqltext := fmt.Sprintf(`
+		select * from information_schema.views 
+		where table_catalog = '%s' and table_name = '%s'
+		`, p.opt.Auth.Database, table)
+
+	return p.sqlHandler2Json(c, sqltext)
 }
 
 // get columns of table to string with ',' split
@@ -352,47 +317,4 @@ func (p *ClickhouseHandler) getColumns(table string) (string, error) {
 	columns = strings.ReplaceAll(columns, "'", "")
 	columns = strings.Trim(columns, "[]")
 	return columns, nil
-}
-
-func (p *ClickhouseHandler) openDB() error {
-	//将空闲时间字符串解析为time.Duration类型
-	MaxIdleDuration, err := time.ParseDuration(p.Dbconfig.MaxIdleTime)
-	if err != nil {
-		return fmt.Errorf("parse dbconfig.maxidletime [%s] failed: %s", p.Dbconfig.MaxIdleTime, err)
-	}
-
-	//打开数据库连接
-	db, err := sql.Open(p.Dbconfig.Dbtype, p.Dbconfig.Dsn[0])
-	if err != nil {
-		log.Error("open database failed:", err)
-		return err
-	}
-
-	//设置最大开放连接数，注意该值为小于0或等于0指的是无限制连接数
-	db.SetMaxOpenConns(p.Dbconfig.MaxOpenConns)
-
-	//设置空闲连接数，将此值设置为小于或等于0将意味着不保留空闲连接，即立即关闭连接
-	db.SetMaxIdleConns(p.Dbconfig.MaxIdleConns)
-
-	//设置最大空闲超时
-	db.SetConnMaxIdleTime(MaxIdleDuration)
-	ctx, cancel := context.WithTimeout(context.Background(), CLICKHOUSE_MAX_TIMEOUT*time.Second)
-	defer cancel()
-
-	err = db.PingContext(ctx)
-	if err != nil {
-		log.Errorf("ping clickhouse [%s] failed: %s", p.Dbconfig.Dsn[0], err)
-		return err
-	}
-
-	log.Infof("ping clickhouse [%s] success", p.opt.Addr[0])
-	p.db = db
-	return nil
-}
-
-func (p *ClickhouseHandler) Close() error {
-	if p.db != nil {
-		return p.db.Close()
-	}
-	return nil
 }
