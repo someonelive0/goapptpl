@@ -469,7 +469,7 @@ func (p *ApiServer) buzHandler(c fiber.Ctx) error {
 	log.Tracef("pageNo %d, pageSize %d", pageNo, pageSize)
 	log.Tracef("offset from %d to %d", offset0, offset1)
 
-	c.Context().SetContentType("application/json")
+	c.Response().Header.Set("Content-Type", "application/json")
 
 	b, _ := json.Marshal(buzs[offset0:offset1])
 	resp := fmt.Sprintf(`{
