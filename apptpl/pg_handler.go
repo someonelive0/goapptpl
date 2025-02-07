@@ -52,7 +52,7 @@ func (p *PgHandler) AddRouter(r fiber.Router) error {
 
 // GET /postgresql
 func (p *PgHandler) homeHandler(c fiber.Ctx) error {
-	c.Context().SetContentType("text/html")
+	c.Response().Header.Set("Content-Type", "text/html")
 	c.WriteString(`<html><body><h1>Postgresql Information</h1>
 	<a href="/postgresql/tables?mime=json">tables</a><br>
 	<a href="/postgresql/table/:table?mime=json">table/:table_name/[columns|indexes|constraints|keys|references|triggers|stats|describe|ddl]</a><br>

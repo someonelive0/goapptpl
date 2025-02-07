@@ -73,7 +73,7 @@ func (p *MysqlHandler) AddRouter(r fiber.Router) error {
 
 // GET /mysql
 func (p *MysqlHandler) homeHandler(c fiber.Ctx) error {
-	c.Context().SetContentType("text/html")
+	c.Response().Header.Set("Content-Type", "text/html")
 	c.WriteString(`<html><body><h1>Mysql Information</h1>
 	<a href="/mysql/tables?mime=json">tables</a><br>
 	<a href="/mysql/table/:table?mime=json">table/:table_name/[columns|indexes|constraints|keys|references|triggers|stats|describe|ddl]</a><br>
@@ -129,7 +129,7 @@ func (p *MysqlHandler) tablesViewsHandler(c fiber.Ctx, table_type string) error 
 		// return p.sqlHandlerByJson(c, sqltext)
 		// use local cache to reduce mysql load
 		if b, found := p.Mycache.Get("mysql:tables"); found {
-			c.Context().SetContentType("application/json")
+			c.Response().Header.Set("Content-Type", "application/json")
 			c.Write(b.([]byte))
 			return nil
 		}
@@ -144,7 +144,7 @@ func (p *MysqlHandler) tablesViewsHandler(c fiber.Ctx, table_type string) error 
 			}
 		}()
 
-		c.Context().SetContentType("application/json")
+		c.Response().Header.Set("Content-Type", "application/json")
 		c.WriteString("[")
 		i := 0
 		for jsonstr := range ch {

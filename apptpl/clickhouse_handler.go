@@ -55,7 +55,7 @@ func (p *ClickhouseHandler) AddRouter(r fiber.Router) error {
 
 // GET /clickhouse
 func (p *ClickhouseHandler) homeHandler(c fiber.Ctx) error {
-	c.Context().SetContentType("text/html")
+	c.Response().Header.Set("Content-Type", "text/html")
 	c.WriteString(`<html><body><h1>Clickhouse Information</h1>
 	<a href="/clickhouse/tables?mime=json">tables</a><br>
 	<a href="/clickhouse/table/:table?mime=json">table/:table_name/[columns|ddl]</a><br>

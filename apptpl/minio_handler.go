@@ -57,7 +57,7 @@ func (p *MinioHandler) bucketsHandler(c fiber.Ctx) error {
 		return err
 	}
 
-	c.Context().SetContentType("application/json")
+	c.Response().Header.Set("Content-Type", "application/json")
 	data, _ := json.MarshalIndent(buckets, "", "  ")
 	return c.Send(data)
 }
@@ -80,7 +80,7 @@ func (p *MinioHandler) objectsHandler(c fiber.Ctx) error {
 			Recursive: true,
 		})
 
-	c.Context().SetContentType("application/json")
+	c.Response().Header.Set("Content-Type", "application/json")
 	c.WriteString("[")
 	i := 0
 	for object := range objectCh {
@@ -130,7 +130,7 @@ func (p *MinioHandler) objectInfoHandler(c fiber.Ctx) error {
 	}
 
 	if mime == "json" {
-		c.Context().SetContentType("application/json")
+		c.Response().Header.Set("Content-Type", "application/json")
 		data, _ := json.MarshalIndent(objectInfo, "", "  ")
 		return c.Send(data)
 	} else if mime == "xml" {

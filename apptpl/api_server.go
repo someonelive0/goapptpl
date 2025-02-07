@@ -302,7 +302,8 @@ func (p *ApiServer) ticketHandler(c fiber.Ctx) error {
 			"tenant": ""
 		}
 	}`
-	c.Context().SetContentType("application/json")
+	c.Response().Header.Set("Content-Type", "application/json")
+	// c.Context().SetContentType("application/json")
 	c.WriteString(resp)
 
 	return nil
@@ -359,7 +360,7 @@ func (p *ApiServer) aiAnalyzeriskHandler(c fiber.Ctx) error {
 		return err
 	}
 
-	c.Context().SetContentType("application/json")
+	c.Response().Header.Set("Content-Type", "application/json")
 	c.WriteString(resp)
 
 	return nil
@@ -415,7 +416,7 @@ func (p *ApiServer) aiDataidentifyHandler(c fiber.Ctx) error {
 		return err
 	}
 
-	c.Context().SetContentType("application/json")
+	c.Response().Header.Set("Content-Type", "application/json")
 	c.WriteString(resp)
 
 	return nil

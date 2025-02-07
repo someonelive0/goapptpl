@@ -40,7 +40,7 @@ func (p *HostHandler) AddRouter(r fiber.Router) error {
 
 // GET /host
 func (p *HostHandler) homeHandler(c fiber.Ctx) error {
-	c.Context().SetContentType("text/html")
+	c.Response().Header.Set("Content-Type", "text/html")
 	c.WriteString(`<html><body><h1>Host Information</h1>
 	<a href="/host/os">os</a><br>
 	<a href="/host/user">user</a><br>
@@ -75,7 +75,7 @@ func (p *HostHandler) osHandler(c fiber.Ctx) error {
 	// s += fmt.Sprintf(`"family": "%s", `, family)
 	// s += fmt.Sprintf(`"version": "%s"}`, version)
 
-	c.Context().SetContentType("application/json")
+	c.Response().Header.Set("Content-Type", "application/json")
 	c.WriteString(s)
 
 	info, _ := host.Info()
@@ -93,6 +93,7 @@ func (p *HostHandler) userHandler(c fiber.Ctx) error {
 		return err
 	}
 
+	c.Response().Header.Set("Content-Type", "application/json")
 	b, _ := json.MarshalIndent(users, "", " ")
 	c.Write(b)
 
@@ -126,8 +127,9 @@ func (p *HostHandler) cpuHandler(c fiber.Ctx) error {
 	// 	fmt.Print(string(data))
 	// }
 
-	c.Context().SetContentType("application/json")
+	c.Response().Header.Set("Content-Type", "application/json")
 	c.WriteString(s)
+
 	return nil
 }
 
@@ -161,8 +163,9 @@ func (p *HostHandler) loadingHandler(c fiber.Ctx) error {
 
 	s += `]}`
 
-	c.Context().SetContentType("application/json")
+	c.Response().Header.Set("Content-Type", "application/json")
 	c.WriteString(s)
+
 	return nil
 }
 
@@ -172,8 +175,9 @@ func (p *HostHandler) memHandler(c fiber.Ctx) error {
 	//fmt.Printf("Total: %v, Available: %v, UsedPercent:%f%%\n", v.Total, v.Available, v.UsedPercent)
 	s := fmt.Sprintf("%v", v)
 
-	c.Context().SetContentType("application/json")
+	c.Response().Header.Set("Content-Type", "application/json")
 	c.WriteString(s)
+
 	return nil
 }
 
@@ -181,7 +185,7 @@ func (p *HostHandler) memHandler(c fiber.Ctx) error {
 func (p *HostHandler) diskHandler(c fiber.Ctx) error {
 	partitions, _ := disk.Partitions(true)
 	b, _ := json.MarshalIndent(partitions, "", " ")
-	c.Context().SetContentType("application/json")
+	c.Response().Header.Set("Content-Type", "application/json")
 	c.Write(b)
 
 	for _, partition := range partitions {
@@ -197,7 +201,7 @@ func (p *HostHandler) diskHandler(c fiber.Ctx) error {
 func (p *HostHandler) netHandler(c fiber.Ctx) error {
 	connections, _ := psnet.Connections("all")
 
-	c.Context().SetContentType("application/json")
+	c.Response().Header.Set("Content-Type", "application/json")
 	b, _ := json.Marshal(connections)
 	c.Write(b)
 
@@ -232,7 +236,7 @@ func (p *HostHandler) netHandler(c fiber.Ctx) error {
 func (p *HostHandler) processHandler(c fiber.Ctx) error {
 	pids, _ := process.Pids()
 
-	c.Context().SetContentType("application/json")
+	c.Response().Header.Set("Content-Type", "application/json")
 	b, _ := json.Marshal(pids)
 	c.Write(b)
 

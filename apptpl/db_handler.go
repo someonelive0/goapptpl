@@ -41,7 +41,7 @@ func (p *DbHandler) sqlHandler2Json(c fiber.Ctx, sqltext string) error {
 	defer rows.Close()
 
 	// c.Context().SetContentType("text/x-sql;charset=UTF-8") // text/plain;charset=UTF-8
-	c.Context().SetContentType("application/json")
+	c.Response().Header.Set("Content-Type", "application/json")
 
 	columns, err := rows.Columns()
 	if err != nil {
@@ -125,7 +125,7 @@ func (p *DbHandler) sqlHandlerByJson(c fiber.Ctx, sqltext string) error {
 	}
 	defer rows.Close()
 
-	c.Context().SetContentType("application/json")
+	c.Response().Header.Set("Content-Type", "application/json")
 
 	c.WriteString("[")
 	i := 0
