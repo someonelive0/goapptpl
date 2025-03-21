@@ -15,9 +15,9 @@ import (
 )
 
 var (
-	param_debug   = flag.Bool("D", false, "debug")
 	param_version = flag.Bool("v", false, "version")
-	param_config  = flag.String("f", "etc/goapptpl.toml", "config filename")
+	param_test    = flag.Bool("T", false, "test config file")
+	param_config  = flag.String("c", "etc/goapptpl.toml", "config filename")
 	START_TIME    = time.Now()
 	myconfig      *MyConfig
 )
@@ -42,6 +42,11 @@ func init() {
 		os.Exit(1)
 	}
 	myconfig = config
+	// test config
+	if *param_test {
+		fmt.Printf("myconfig %s\n", myconfig.Dump())
+		os.Exit(0)
+	}
 
 	// init log
 	err = utils.InitLogRotate(myconfig.LogConfig.Path, myconfig.LogConfig.Filename,
@@ -53,9 +58,9 @@ func init() {
 		os.Exit(1)
 	}
 
-	log.Infof("BEGIN... %v, config=%v, debug=%v",
-		START_TIME.Format("2006-01-02 15:04:05"), *param_config, *param_debug)
-	log.Debugf("MyConfig: %s", myconfig.Dump())
+	log.Infof("BEGIN... %v, config=%v",
+		START_TIME.Format("2006-01-02 15:04:05"), *param_config)
+	// log.Debugf("MyConfig: %s", myconfig.Dump())
 }
 
 func main() {
