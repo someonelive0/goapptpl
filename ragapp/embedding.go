@@ -31,7 +31,7 @@ func (p *Embedding) Embed(text string) ([]float64, error) {
 	cli := api.NewClient(u, httpclient)
 
 	req := &api.EmbeddingRequest{
-		Model:  "tazarov/all-minilm-l6-v2-f32",
+		Model:  "tazarov/all-minilm-l6-v2-f32", // "mxbai-embed-large"
 		Prompt: text,
 	}
 

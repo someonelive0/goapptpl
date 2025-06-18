@@ -23,7 +23,7 @@ func embdding_text(text string) error {
 	cli := api.NewClient(u, httpclient)
 
 	req := &api.EmbeddingRequest{
-		Model:  "tazarov/all-minilm-l6-v2-f32",
+		Model:  "tazarov/all-minilm-l6-v2-f32", // "mxbai-embed-large"
 		Prompt: text,
 	}
 	resp, err := cli.Embeddings(context.Background(), req)
@@ -82,7 +82,7 @@ func searchSimilarDocuments(query string, k int) ([]string, error) {
 	cli := api.NewClient(u, httpclient)
 
 	req := &api.EmbeddingRequest{
-		Model:  "tazarov/all-minilm-l6-v2-f32",
+		Model:  "tazarov/all-minilm-l6-v2-f32", // "mxbai-embed-large"
 		Prompt: query,
 	}
 	resp, err := cli.Embeddings(context.Background(), req)
