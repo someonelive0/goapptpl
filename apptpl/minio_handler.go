@@ -25,12 +25,26 @@ type MinioHandler struct {
 func (p *MinioHandler) AddRouter(r fiber.Router) error {
 	log.Info("MinioHandler AddRouter")
 
+	r.Get("", p.homeHandler)
+	r.Get("/", p.homeHandler)
 	r.Get("/buckets", p.bucketsHandler)
 	r.Get("/bucket/:bucket/objects", p.objectsHandler)
 	r.Get("/bucket/:bucket/object-meta/:object", p.objectInfoHandler)
 	r.Get("/bucket/:bucket/object/:object", p.objectHandler)
 	// r.Head("/bucket/:bucket/object/:object", objectInfoHander)
 
+	return nil
+}
+
+// GET /minio
+func (p *MinioHandler) homeHandler(c fiber.Ctx) error {
+	c.Response().Header.Set("Content-Type", "text/html")
+	c.WriteString(`<html><body><h1>Minio Information</h1>
+	<a href="/minio/buckets?mime=json">buckets</a><br>
+	<a href="/minio/bucket/:bucket/objects">/bucket/:bucket/objects</a><br>
+	<a href="/minio/bucket/:bucket/object-meta/:object">/bucket/:bucket/object-meta/:object</a><br>
+	<a href="/minio/bucket/:bucket/object/:object">/bucket/:bucket/object/:object</a><br>
+	</body></html>`)
 	return nil
 }
 

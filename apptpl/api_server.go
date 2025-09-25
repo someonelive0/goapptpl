@@ -11,6 +11,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/adaptor"
+	"github.com/gofiber/fiber/v3/middleware/redirect"
 	"github.com/osamingo/gosh"
 	"github.com/patrickmn/go-cache"
 	log "github.com/sirupsen/logrus"
@@ -205,8 +206,33 @@ func (p *ApiServer) initRoute(app *fiber.App) error {
 	// app.GET("/config", handler.handleConfig)
 	// app.GET("/health", handler.handleHealth)
 	// app.GET("/cache", handler.handleCache)
+
+	// Fiber redirect midlleware
+	app.Use(redirect.New(redirect.Config{
+		Rules: map[string]string{
+			"/": "/meta",
+		},
+		StatusCode: 301,
+	}))
+
 	app.Route("/").Get(func(c fiber.Ctx) error {
-		return fiber.NewError(400, "please access /meta/status")
+		return fiber.NewError(300, "please access /meta")
+	})
+	app.Route("/meta").Get(func(c fiber.Ctx) error {
+		c.Response().Header.Set("Content-Type", "text/html")
+		return c.SendString(`<html><body><h1>Meta Information</h1>
+		<a href="/meta/status">/meta/status</a><br>
+		<a href="/meta/version">/meta/version</a><br>
+		<a href="/meta/config">/meta/config</a><br>
+		<h1>Sub modules</h1>
+		<a href="/mysql">/mysql</a><br>
+		<a href="/minio">/minio</a><br>
+		<a href="/redis">/redis</a><br>
+		<a href="/clickhouse">/clickhouse</a><br>
+		<a href="/postgresql">/postgresql</a><br>
+		<a href="/hardware">/hardware</a><br>
+		<a href="/host">/host</a><br>
+		</body></html>`)
 	})
 	app.Route("/meta/status").Get(func(c fiber.Ctx) error {
 		s := fmt.Sprintf(`{ "status": "%s", "runtime": "%s" }`,
@@ -244,10 +270,6 @@ func (p *ApiServer) initRoute(app *fiber.App) error {
 		app.Get("/meta/healthz", adaptor.HTTPHandler(healthzHandler))
 	}
 
-	app.Post("/ticket/v1/analysis", p.ticketHandler)
-	app.Post("/datasecurity/analyzerisk/v2/batch", p.aiAnalyzeriskHandler)
-	app.Post("/datasecurity/crucialdataonfly/identify/v1/batch", p.aiDataidentifyHandler)
-
 	// Or extend your config for customization
 	// Assign the middleware to /metrics
 	// and change the Title to `MyService Metrics Page`
@@ -272,152 +294,4 @@ func (p *ApiServer) authMiddleware(c fiber.Ctx) error {
 	// log.Info(claims)
 
 	return c.Next()
-}
-
-func (p *ApiServer) ticketHandler(c fiber.Ctx) error {
-	log.Debugf("headers: %v", c.GetReqHeaders())
-	log.Debugf("body: %s", c.Body())
-
-	m := make(map[string]string)
-	if err := json.Unmarshal(c.Body(), &m); err != nil {
-		log.Errorf("json.Unmarshal error: %#v", err)
-		return err
-	}
-	log.Debugf("request appCode: %#v", m["appCode"])
-	log.Debugf("request tenant: %#v", m["tenant"])
-	log.Debugf("request ticket/data: %#v", m["data"])
-
-	resp := `{
-		"retCode": "1000",
-		"msg": "",
-		"token": "",
-		"userInfo": {
-			"accountID": "yewu-test",
-			"name": "",
-			"empNo": "",
-			"idCardNum": "",
-			"phone": "",
-			"mobile": "",
-			"email": "",
-			"tenant": ""
-		}
-	}`
-	c.Response().Header.Set("Content-Type", "application/json")
-	// c.Context().SetContentType("application/json")
-	c.WriteString(resp)
-
-	return nil
-}
-
-func (p *ApiServer) aiAnalyzeriskHandler(c fiber.Ctx) error {
-
-	// test failed response
-	// return fiber.NewError(400, `{ "detail": "AI模型分析失败" }`)
-
-	// log.Debugf("headers: %v", c.GetReqHeaders())
-	log.Debugf("body: %s", c.Body())
-
-	m := make(map[string]interface{})
-	if err := json.Unmarshal(c.Body(), &m); err != nil {
-		log.Errorf("json.Unmarshal error: %#v", err)
-		return err
-	}
-	if _, ok := m["inputs"]; !ok {
-		return fiber.NewError(400, "inputs is required")
-	}
-	// log.Debugf("request inputs: %#v", m["inputs"])
-	// log.Debugf("request tenant: %#v", m["tenant"])
-	// log.Debugf("request ticket/data: %#v", m["data"])
-
-	resp := `{
-		"detail": "success",
-		"output": [`
-	inputs := m["inputs"].([]interface{})
-	for i, input := range inputs {
-		log.Debugf("request input: %#v", input)
-		if i > 0 {
-			resp += ", "
-		}
-
-		requestId := ""
-		if _, ok := input.(map[string]interface{})["requestId"]; ok {
-			requestId = input.(map[string]interface{})["requestId"].(string)
-		}
-
-		resp += fmt.Sprintf(`{
-			"isAgree":  1,
-			"reason": "符合风险AI模型",
-			"requestId": "%s"
-		}`, requestId)
-	}
-
-	resp += `
-	] }`
-
-	log.Debugf("response: |%s|", resp)
-	if err := json.Unmarshal([]byte(resp), &m); err != nil {
-		log.Errorf("json.Unmarshal resp error: %#v", err)
-		return err
-	}
-
-	c.Response().Header.Set("Content-Type", "application/json")
-	c.WriteString(resp)
-
-	return nil
-}
-
-func (p *ApiServer) aiDataidentifyHandler(c fiber.Ctx) error {
-
-	// test failed response
-	// return fiber.NewError(400, `{ "detail": "AI模型分析重要数据失败" }`)
-
-	// log.Debugf("headers: %v", c.GetReqHeaders())
-	log.Debugf("body: %s", c.Body())
-
-	m := make(map[string]interface{})
-	if err := json.Unmarshal(c.Body(), &m); err != nil {
-		log.Errorf("json.Unmarshal error: %#v", err)
-		return err
-	}
-	if _, ok := m["inputs"]; !ok {
-		return fiber.NewError(400, "inputs is required")
-	}
-	// log.Debugf("request inputs: %#v", m["inputs"])
-	// log.Debugf("request tenant: %#v", m["tenant"])
-	// log.Debugf("request ticket/data: %#v", m["data"])
-
-	resp := `{
-		"detail": "ok",
-		"output": [`
-	inputs := m["inputs"].([]interface{})
-	for i, input := range inputs {
-		log.Debugf("request input: %#v", input)
-		if i > 0 {
-			resp += ", "
-		}
-		apiPattern := ""
-		if _, ok := input.(map[string]interface{})["apiPattern"]; ok {
-			apiPattern = input.(map[string]interface{})["apiPattern"].(string)
-		}
-
-		resp += fmt.Sprintf(`{
-			"isCrucial":  1,
-			"categories": ["身份鉴别信息", "A-2", "重要信息"],
-			"apiPattern": "%s"
-		}`, apiPattern)
-	}
-
-	resp += `
-	] }`
-
-	log.Debugf("response: |%s|", resp)
-	if err := json.Unmarshal([]byte(resp), &m); err != nil {
-		log.Errorf("json.Unmarshal resp error: %#v", err)
-		return err
-	}
-
-	c.Response().Header.Set("Content-Type", "application/json")
-	c.WriteString(resp)
-
-	return nil
 }

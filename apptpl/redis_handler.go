@@ -20,7 +20,9 @@ type RedisHandler struct {
 func (p *RedisHandler) AddRouter(r fiber.Router) error {
 	log.Info("RedisHandler AddRouter")
 
-	// r.Get("/dbs", p.dbsHandler)
+	r.Get("", p.homeHandler)
+	r.Get("/", p.homeHandler)
+	r.Get("/dbs", p.dbsHandler)
 	r.Get("/db/:db/keys", p.keysHandler)
 	r.Get("/db/:db/keys/:prefix", p.keysHandler)
 	r.Get("/db/:db/key/:key", p.keyHandler)
@@ -30,10 +32,22 @@ func (p *RedisHandler) AddRouter(r fiber.Router) error {
 	return nil
 }
 
+// GET /redis
+func (p *RedisHandler) homeHandler(c fiber.Ctx) error {
+	c.Response().Header.Set("Content-Type", "text/html")
+	c.WriteString(`<html><body><h1>Redis Information</h1>
+	<a href="/redis/dbs?mime=json">dbs</a><br>
+	<a href="/redis/db/:db/keys">db/:db/keys</a><br>
+	<a href="/redis/db/:db/keys/:prefix">db/:db/keys/:prefix</a><br>
+	<a href="/redis/db/:db/key/:key">/db/:db/key/:key</a><br>
+	</body></html>`)
+	return nil
+}
+
 // GET /dbs?mime=excel|json
-// func (p *RedisHandler) dbsHandler(c fiber.Ctx) error {
-// 	return nil
-// }
+func (p *RedisHandler) dbsHandler(c fiber.Ctx) error {
+	return fiber.NewError(500, "not ready for /dbs")
+}
 
 // GET /db/:db/keys?mime=excel|json
 func (p *RedisHandler) keysHandler(c fiber.Ctx) error {
