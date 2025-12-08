@@ -215,10 +215,10 @@ func (p *ApiServer) initRoute(app *fiber.App) error {
 		StatusCode: 301,
 	}))
 
-	app.Route("/").Get(func(c fiber.Ctx) error {
+	app.Get("/", func(c fiber.Ctx) error {
 		return fiber.NewError(300, "please access /meta")
 	})
-	app.Route("/meta").Get(func(c fiber.Ctx) error {
+	app.Get("/meta", func(c fiber.Ctx) error {
 		c.Response().Header.Set("Content-Type", "text/html")
 		return c.SendString(`<html><body><h1>Meta Information</h1>
 		<a href="/meta/status">/meta/status</a><br>
@@ -234,7 +234,7 @@ func (p *ApiServer) initRoute(app *fiber.App) error {
 		<a href="/host">/host</a><br>
 		</body></html>`)
 	})
-	app.Route("/meta/status").Get(func(c fiber.Ctx) error {
+	app.Get("/meta/status", func(c fiber.Ctx) error {
 		s := fmt.Sprintf(`{ "status": "%s", "runtime": "%s" }`,
 			"running", START_TIME.Format(time.RFC3339)) // "2006-01-02 15:04:05"
 		return c.SendString(s)
