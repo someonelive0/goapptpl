@@ -9,3 +9,5 @@
 goapptpl
 testing/*.docx
 ragapp/db
+filetool/filetool
+filetool/go.sum

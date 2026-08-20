@@ -1,0 +1,24 @@
+package main
+
+import (
+	"encoding/xml"
+	"os"
+
+	"github.com/gomutex/godocx"
+)
+
+func docxtool_file2txt(in_file, out_file string) error {
+	document, err := godocx.OpenDocument(in_file)
+	if err != nil {
+		return nil
+	}
+
+	// document.Document.
+	xmlEncoder := xml.NewEncoder(os.Stdout)
+	err = document.Document.Body.MarshalXML(xmlEncoder, xml.StartElement{})
+	if err != nil {
+		return nil
+	}
+
+	return nil
+}
